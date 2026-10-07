@@ -92,9 +92,9 @@ function sendNotificationEmail(sheet, rowIndex, rowData, headerMap) {
       return false;
     }
 
-    // ข้ามการส่ง ถ้าเรื่องที่แจ้งขึ้นต้นด้วย prefix ที่กำหนดไว้ (เช่น PMX2)
-    if (isEmailSkippedBySubject(rowData.subject)) {
-      log('Subject matches skip rule, skip email notification: ' + rowData.jobNo + ' - ' + rowData.subject, LOG_LEVEL.INFO);
+    // ข้ามการส่ง ถ้าเรื่องที่แจ้งขึ้นต้นด้วย prefix ที่กำหนดไว้ (เช่น PMX2) หรือโปรแกรมเป็น ProMaxx2
+    if (isEmailSkippedForRow(rowData)) {
+      log('Subject/product matches skip rule, skip email notification: ' + rowData.jobNo + ' - ' + rowData.subject + ' - ' + rowData.productName, LOG_LEVEL.INFO);
       return false;
     }
 

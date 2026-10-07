@@ -44,7 +44,7 @@ function processRow(sheet, rowData, headerMap) {
       const hasStatusChanged = existingStatus !== String(rowData.status).trim();
       const hasAssigntoChanged = existingAssignto !== String(rowData.assignto).trim();
       const hasSysDevelopChanged = existingSysDevelop !== String(rowData.sysDevelop || '').trim();
-      const shouldNotify = shouldProcessForEmail(rowData.status, '') && existingEmailKey !== currentEmailKey && !isEmailSkippedBySubject(rowData.subject);
+      const shouldNotify = shouldProcessForEmail(rowData.status, '') && existingEmailKey !== currentEmailKey && !isEmailSkippedForRow(rowData);
       const shouldBackfillOriginalAssignto = headerMap.originalAssignto && !existingOriginalAssignto && !!updateData[headerMap.originalAssignto];
       const shouldAddFlowEvent = hasStatusChanged || hasAssigntoChanged || hasSysDevelopChanged;
       if (shouldAddFlowEvent) {
@@ -77,7 +77,7 @@ function processRow(sheet, rowData, headerMap) {
       setRowValues(sheet, newRowIndex, updateData);
       log('Added new row: ' + rowData.jobNo, LOG_LEVEL.INFO);
       
-      return { rowIndex: newRowIndex, isNew: true, shouldNotify: shouldProcessForEmail(rowData.status, '') && !isEmailSkippedBySubject(rowData.subject) };
+      return { rowIndex: newRowIndex, isNew: true, shouldNotify: shouldProcessForEmail(rowData.status, '') && !isEmailSkippedForRow(rowData) };
     }
   } catch (e) {
     log('Error processing row: ' + e.message, LOG_LEVEL.ERROR);
@@ -382,7 +382,7 @@ function processAllRows(sheet, dataRows, headerMap) {
           const hasStatusChanged = existingStatus !== String(rowData.status).trim();
           const hasAssigntoChanged = existingAssignto !== String(rowData.assignto).trim();
           const hasSysDevelopChanged = existingSysDevelop !== String(rowData.sysDevelop || '').trim();
-          const shouldNotify = shouldProcessForEmail(rowData.status, '') && existingEmailKey !== currentEmailKey && !isEmailSkippedBySubject(rowData.subject);
+          const shouldNotify = shouldProcessForEmail(rowData.status, '') && existingEmailKey !== currentEmailKey && !isEmailSkippedForRow(rowData);
           const shouldBackfillOriginalAssignto = headerMap.originalAssignto && !existingOriginalAssignto && !!updateData[headerMap.originalAssignto];
           const shouldAddFlowEvent = hasStatusChanged || hasAssigntoChanged || hasSysDevelopChanged;
           if (shouldAddFlowEvent) {
@@ -419,7 +419,7 @@ function processAllRows(sheet, dataRows, headerMap) {
           appendRows.push(buildSheetRowValues([], updateData, maxCol));
           jobNoIndex[jobNoKey] = newRowIndex;
 
-          if (shouldProcessForEmail(rowData.status, '') && !isEmailSkippedBySubject(rowData.subject)) {
+          if (shouldProcessForEmail(rowData.status, '') && !isEmailSkippedForRow(rowData)) {
             rowsToNotify.push({
               rowIndex: newRowIndex,
               rowData: rowData,
@@ -830,6 +830,34 @@ function shouldProcessForEmail(status, existingStatus) {
     log('Error checking if should process for email: ' + e.message, LOG_LEVEL.WARNING);
     return false;
   }
+}
+
+/**
+ * ตรวจสอบว่างานนี้ต้องข้ามการส่งอีเมลแจ้งเตือนรายงานหรือไม่
+ * (subject ขึ้นต้นด้วย prefix ใน EMAIL_SKIP_SUBJECT_PREFIXES หรือโปรแกรมอยู่ใน EMAIL_SKIP_PRODUCT_NAMES)
+ * @param {Object} rowData - ข้อมูลแถว
+ * @return {boolean} true ถ้าต้องข้ามการส่งอีเมล
+ */
+function isEmailSkippedForRow(rowData) {
+  return isEmailSkippedBySubject(rowData && rowData.subject) || isEmailSkippedByProductName(rowData && rowData.productName);
+}
+
+/**
+ * ตรวจสอบว่า "โปรแกรม" (productName) ต้องข้ามการส่งอีเมลแจ้งเตือนรายงานหรือไม่
+ * @param {string} productName - โปรแกรม
+ * @return {boolean} true ถ้าต้องข้ามการส่งอีเมล
+ */
+function isEmailSkippedByProductName(productName) {
+  const productTrim = String(productName || '')
+    .replace(/[​-‍﻿]/g, '')
+    .trim()
+    .toUpperCase();
+
+  if (!productTrim) {
+    return false;
+  }
+
+  return EMAIL_SKIP_PRODUCT_NAMES.some((name) => productTrim === String(name).trim().toUpperCase());
 }
 
 /**

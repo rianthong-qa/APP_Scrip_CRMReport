@@ -55,6 +55,8 @@ const EMAIL_SUBJECT_TEMPLATE = 'แจ้งเตือนสถานะงา
 const EMAIL_TIMEZONE = 'GMT+7'; // ประเทศไทย
 // ข้ามการส่งอีเมลแจ้งเตือนรายงาน (per-job) เมื่อ "เรื่องที่แจ้ง" ขึ้นต้นด้วย prefix เหล่านี้
 const EMAIL_SKIP_SUBJECT_PREFIXES = ['PMX2'];
+// ข้ามการส่งอีเมลแจ้งเตือนรายงาน (per-job) เมื่อ "โปรแกรม" ตรงกับชื่อเหล่านี้ (ไม่สนตัวพิมพ์เล็ก/ใหญ่)
+const EMAIL_SKIP_PRODUCT_NAMES = ['ProMaxx2'];
 
 // ========== Header Mapping ==========
 const REQUIRED_HEADERS = [
