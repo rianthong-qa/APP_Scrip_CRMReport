@@ -121,26 +121,29 @@ function moveProcessedFileToTrash(file) {
  */
 function convertExcelToSpreadsheet(file) {
   try {
-    // เตรียมข้อมูลสำหรับแปลงไฟล์
-    const resource = {
-      title: file.getName() + '_converted_' + Date.now(),
-      mimeType: MimeType.GOOGLE_SHEETS
-    };
-    
     // ตรวจสอบว่า Advanced Drive service พร้อมใช้งานหรือไม่
     if (typeof Drive === 'undefined' || !Drive.Files) {
       log('Advanced Drive service is not available. Enable Drive API in Advanced Google services and Google Cloud Console.', LOG_LEVEL.ERROR);
       throw new Error('Advanced Drive service not enabled. Please enable Drive API in Advanced Google services and Google Cloud Console.');
     }
 
-    log('Converting file: ' + file.getName() + ' | MIME: ' + file.getMimeType() + ' | Size: ' + file.getSize(), LOG_LEVEL.INFO);
+    // Drive API v3 ใช้ Files.create + name และแปลงไฟล์จาก mimeType ปลายทาง
+    // Drive API v2 ใช้ Files.insert + title และต้องส่ง { convert: true }
+    const isDriveV3 = typeof Drive.Files.create === 'function';
+    const convertedName = file.getName() + '_converted_' + Date.now();
+    const resource = isDriveV3
+      ? { name: convertedName, mimeType: MimeType.GOOGLE_SHEETS }
+      : { title: convertedName, mimeType: MimeType.GOOGLE_SHEETS };
+    const convertOptions = isDriveV3 ? {} : { convert: true };
+
+    log('Converting file: ' + file.getName() + ' | MIME: ' + file.getMimeType() + ' | Size: ' + file.getSize() + ' | Drive API: ' + (isDriveV3 ? 'v3' : 'v2'), LOG_LEVEL.INFO);
 
     // วิธีหลัก: copy-convert จากไฟล์ที่อยู่บน Drive โดยตรง
     let convertedFile = null;
     let copyError = null;
     try {
-      if (Drive.Files.copy) {
-        convertedFile = Drive.Files.copy(resource, file.getId(), { convert: true });
+      if (typeof Drive.Files.copy === 'function') {
+        convertedFile = Drive.Files.copy(resource, file.getId(), convertOptions);
       }
     } catch (e) {
       copyError = e;
@@ -150,14 +153,16 @@ function convertExcelToSpreadsheet(file) {
     // วิธีสำรอง: upload blob แล้ว convert
     if (!convertedFile || !convertedFile.id) {
       try {
-        if (!Drive.Files.insert) {
-          throw new Error('Drive.Files.insert is not available.');
-        }
-
         const blob = normalizeExcelBlob(file);
-        convertedFile = Drive.Files.insert(resource, blob, { convert: true });
+        if (isDriveV3) {
+          convertedFile = Drive.Files.create(resource, blob);
+        } else if (typeof Drive.Files.insert === 'function') {
+          convertedFile = Drive.Files.insert(resource, blob, convertOptions);
+        } else {
+          throw new Error('Neither Drive.Files.create nor Drive.Files.insert is available.');
+        }
       } catch (e) {
-        log('Drive.Files.insert conversion failed: ' + e.message, LOG_LEVEL.ERROR);
+        log('Drive upload conversion failed: ' + e.message, LOG_LEVEL.ERROR);
         if (copyError) {
           log('Primary conversion error was: ' + copyError.message, LOG_LEVEL.ERROR);
         }
