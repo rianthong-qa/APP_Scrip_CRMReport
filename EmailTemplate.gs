@@ -17,367 +17,128 @@
  */
 let FLOW_TRACKING_EVENTS_CACHE = null;
 
+const EMAIL_FONT_STACK = "'Kanit','Sarabun','Leelawadee UI','Segoe UI',Tahoma,Arial,sans-serif";
+const EMAIL_FLOW_MAX_EVENTS = 10;
+
 function buildEmailBody(sheet, rowIndex, rowData, headerMap) {
   try {
-    const detailsTable = buildDetailsTable(rowData);
-    const flowTrackingSection = buildFlowTrackingSection(sheet, rowIndex, rowData, headerMap);
-    const headerStatusColor = getStatusColor(rowData.status);
-    const headerStatusTextColor = getStatusTextColor(rowData.status);
-    const headerSubject = buildJobLinkHtml(rowData.jobNo, rowData.subject, 'header-subject');
-    const headerStatus = escapeHtml(rowData.status || 'STATUS');
+    const contactMap = getEmailContactMap();
+    const events = getFlowTrackingEventsForEmail(sheet, rowIndex, rowData, headerMap);
+    const status = String(rowData.status || '').trim() || '-';
+    const accentColor = getStatusAccentColor(status);
+    const previousStatus = getPreviousFlowStatus(events, status);
+    const statusHint = getStatusHint(status);
     const jobUrl = buildJobDetailUrl(rowData.jobNo);
-    const jobAction = jobUrl
-      ? '<a class="action-button" href="' + escapeHtml(jobUrl) + '" target="_blank" rel="noopener noreferrer">เปิดรายละเอียดงาน&nbsp; →</a>'
+    const jobNo = escapeHtml(rowData.jobNo || '-');
+    const subjectText = escapeHtml(rowData.subject || '(ไม่มีหัวเรื่อง)');
+    const subjectHtml = jobUrl
+      ? '<a href="' + escapeHtml(jobUrl) + '" target="_blank" rel="noopener noreferrer" style="color:#0F172A; text-decoration:none;">' + subjectText + '</a>'
+      : subjectText;
+    const statusChangeHtml = previousStatus
+      ? buildStatusBadgeHtml(previousStatus, true) +
+        '<span style="display:inline-block; padding:0 10px; color:#94A3B8; font-size:16px; font-weight:700; vertical-align:middle;">&rarr;</span>' +
+        buildStatusBadgeHtml(status, false)
+      : buildStatusBadgeHtml(status, false);
+    const preheader = 'JOB ' + (rowData.jobNo || '-') + ' · สถานะ ' + status + ' · ' + (rowData.subject || '');
+    const actionButton = jobUrl
+      ? `
+          <tr>
+            <td class="px" align="center" style="padding:24px 28px 0 28px;">
+              <a href="${escapeHtml(jobUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#0F766E; color:#FFFFFF; font-family:${EMAIL_FONT_STACK}; font-size:14px; font-weight:700; line-height:1; text-decoration:none; padding:13px 28px; border-radius:8px;">เปิดรายละเอียดงานใน Bluesea &rarr;</a>
+            </td>
+          </tr>`
       : '';
-    
+
     const html = `
       <!DOCTYPE html>
-      <html>
+      <html lang="th">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="color-scheme" content="light">
+        <meta name="supported-color-schemes" content="light">
+        <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
         <style>
-          body {
-            font-family: 'DM Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.5;
-            color: #16322F;
-            background-color: #EEF6F4;
-            margin: 0;
-            padding: 20px 12px;
-          }
-          .container {
-            max-width: 680px;
-            margin: 0 auto;
-            background-color: #F8FCFB;
-            border: 1px solid #D9EAE6;
-            border-radius: 16px;
-            box-shadow: 0 8px 28px rgba(21,84,76,0.08);
-            overflow: hidden;
-          }
-          .header {
-            background-color: #0F766E;
-            color: #FFFFFF;
-            padding: 22px 24px 20px 24px;
-            text-align: left;
-            border-bottom: 4px solid #F2B84B;
-          }
-          .eyebrow {
-            display: inline-block;
-            background-color: rgba(255,255,255,0.14);
-            border: 1px solid rgba(255,255,255,0.32);
-            border-radius: 999px;
-            color: #FFFFFF;
-            font-size: 10px;
-            font-weight: 800;
-            letter-spacing: 0.08em;
-            padding: 5px 10px;
-            margin-bottom: 12px;
-          }
-          .header-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 0;
-            background-color: transparent;
-            border: 0;
-            table-layout: fixed;
-          }
-          .header-table td {
-            border: 0;
-            padding: 0;
-            vertical-align: middle;
-          }
-          .header-main {
-            padding-right: 16px !important;
-          }
-          .header-status {
-            width: 118px;
-            text-align: right;
-          }
-          .job-number {
-            color: rgba(255,255,255,0.76);
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            margin-bottom: 5px;
-          }
-          .status-pill {
-            display: inline-block;
-            min-width: 74px;
-            max-width: 108px;
-            border: 1px solid rgba(255,255,255,0.35);
-            border-radius: 999px;
-            padding: 7px 11px;
-            font-size: 12px;
-            line-height: 1;
-            font-weight: 800;
-            text-align: center;
-          }
-          .header-subject {
-            display: block;
-            color: #FFFFFF !important;
-            font-size: 18px;
-            font-weight: 800;
-            line-height: 1.35;
-            text-decoration: none;
-          }
-          a.header-subject,
-          a.header-subject:link,
-          a.header-subject:visited,
-          a.header-subject:hover,
-          a.header-subject:active {
-            color: #FFFFFF !important;
-            text-decoration: none !important;
-          }
-          .content {
-            padding: 22px 24px 24px 24px;
-          }
-          .action-row {
-            text-align: right;
-            margin: 0 0 14px 0;
-          }
-          .action-button {
-            display: inline-block;
-            background-color: #0F766E;
-            color: #FFFFFF !important;
-            border-radius: 8px;
-            padding: 8px 12px;
-            font-size: 11px;
-            font-weight: 800;
-            text-decoration: none;
-          }
-          .section {
-            margin-bottom: 18px;
-          }
-          .section-card {
-            background-color: #FFFFFF;
-            border: 1px solid #D9EAE6;
-            border-radius: 12px;
-            padding: 16px;
-          }
-          .section h2 {
-            font-size: 15px;
-            border-bottom: 1px solid #E1ECE9;
-            padding-bottom: 9px;
-            margin: 0 0 12px 0;
-            color: #0F766E;
-          }
-          table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            margin-top: 8px;
-            background-color: #FFFFFF;
-            border: 1px solid #D9EAE6;
-            border-radius: 10px;
-            overflow: hidden;
-          }
-          table th {
-            background-color: #EFF7F5;
-            padding: 9px 10px;
-            text-align: left;
-            font-weight: 800;
-            color: #47716B;
-            border-bottom: 1px solid #D9EAE6;
-            font-size: 11px;
-          }
-          table td {
-            padding: 9px 10px;
-            border-bottom: 1px solid #E8F0EE;
-            font-size: 12px;
-            color: #16322F;
-            vertical-align: top;
-          }
-          .detail-table {
-            margin-top: 0;
-            table-layout: fixed;
-          }
-          .detail-cell {
-            width: 50%;
-            padding: 11px 12px !important;
-          }
-          .detail-cell-left {
-            border-right: 1px solid #E8F0EE;
-          }
-          .detail-label {
-            display: block;
-            color: #6B8C88;
-            font-size: 10px;
-            font-weight: 700;
-            margin-bottom: 3px;
-          }
-          .detail-value {
-            display: block;
-            color: #16322F;
-            font-size: 12px;
-            font-weight: 700;
-            line-height: 1.35;
-          }
-          .inline-status {
-            display: inline-block;
-            border-radius: 999px;
-            padding: 4px 8px;
-            font-size: 10px;
-            font-weight: 800;
-          }
-          .flow-latest {
-            background-color: #EFF7F5;
-            border: 1px solid #CFE3DE;
-            border-left: 4px solid #0F766E;
-            border-radius: 10px;
-            padding: 12px 13px;
-            margin-bottom: 10px;
-          }
-          .flow-latest-label {
-            color: #6B8C88;
-            font-size: 10px;
-            font-weight: 800;
-            margin-bottom: 5px;
-          }
-          .flow-latest-status {
-            display: inline-block;
-            border-radius: 999px;
-            padding: 4px 8px;
-            font-size: 11px;
-            font-weight: 800;
-            margin-bottom: 6px;
-          }
-          .flow-latest-people {
-            color: #27433F;
-            font-size: 12px;
-            font-weight: 700;
-            line-height: 1.45;
-          }
-          .flow-latest-time {
-            color: #6B8C88;
-            font-size: 10px;
-            margin-top: 4px;
-          }
-          .flow-table {
-            table-layout: fixed;
-          }
-          .flow-no {
-            width: 38px;
-            text-align: center;
-          }
-          .flow-time {
-            width: 130px;
-            white-space: nowrap;
-          }
-          .flow-status {
-            width: 72px;
-          }
-          .footer {
-            background-color: #E5F2EF;
-            padding: 12px 16px;
-            font-size: 11px;
-            color: #6B8C88;
-            text-align: center;
-            border-top: 1px solid #D9EAE6;
-          }
-          .footer p {
-            margin: 2px 0;
-          }
-          .updated-time {
-            color: #6B8C88;
-            margin-top: 4px;
-            font-size: 11px;
-            text-align: right;
-          }
+          @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap');
           @media (max-width: 600px) {
-            body {
-              padding: 10px 8px;
-            }
-            .container {
-              border-radius: 12px;
-            }
-            .header {
-              padding: 18px 16px 16px 16px;
-            }
-            .header-main {
-              padding-right: 8px !important;
-            }
-            .header-status {
-              width: 92px;
-            }
-            .status-pill {
-              min-width: 58px;
-              font-size: 11px;
-              padding: 6px 8px;
-            }
-            .header-subject {
-              font-size: 16px;
-            }
-            .content {
-              padding: 16px 14px 18px 14px;
-            }
-            table {
-              font-size: 12px;
-            }
-            table th, table td {
-              padding: 7px;
-            }
-            .detail-table,
-            .detail-table tbody,
-            .detail-table tr,
-            .detail-table td {
-              display: block;
-              width: auto;
-            }
-            .detail-cell-left {
-              border-right: 0;
-            }
-            .flow-table .flow-no,
-            .flow-table .flow-time {
-              display: none;
-            }
-            .flow-table {
-              table-layout: auto;
-            }
+            .px { padding-left: 18px !important; padding-right: 18px !important; }
+            .stack { display: block !important; width: 100% !important; box-sizing: border-box; }
+            .stack-right { border-left: 0 !important; border-top: 1px solid #F1F5F9 !important; }
+            .subject { font-size: 18px !important; }
           }
         </style>
       </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <span class="eyebrow">CRM JOB UPDATE</span>
-            <table class="header-table" role="presentation" cellpadding="0" cellspacing="0">
-              <tr>
-                <td class="header-main">
-                  <div class="job-number">JOB ${escapeHtml(rowData.jobNo || '-')}</div>
-                  ${headerSubject}
-                </td>
-                <td class="header-status">
-                  <span class="status-pill" style="background-color:${headerStatusColor}; color:${headerStatusTextColor};">${headerStatus}</span>
-                </td>
-              </tr>
-            </table>
-          </div>
-          
-          <div class="content">
-            ${jobAction ? '<div class="action-row">' + jobAction + '</div>' : ''}
-            <!-- Job Details -->
-            <div class="section section-card">
-              <h2>รายละเอียดงาน</h2>
-              ${detailsTable}
-            </div>
+      <body style="margin:0; padding:0; background-color:#F1F5F4; font-family:${EMAIL_FONT_STACK}; color:#0F172A;">
+        <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent;">${escapeHtml(preheader)}</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F1F5F4;">
+          <tr>
+            <td align="center" style="padding:24px 12px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:640px; background-color:#FFFFFF; border:1px solid #E2E8F0; border-radius:14px; border-collapse:separate; overflow:hidden;">
+                <tr>
+                  <td style="height:6px; line-height:6px; font-size:0; background-color:${accentColor};">&nbsp;</td>
+                </tr>
 
-            ${flowTrackingSection}
-            
-            <!-- Updated Time -->
-            <div class="updated-time">
-              อัปเดตล่าสุด: ${escapeHtml(formatThaiDate(new Date()))}
-            </div>
-          </div>
-          
-          <div class="footer">
-            <p>ข้อความนี้ถูกส่งโดยระบบ CRM Report เพื่อแจ้งสถานะงานอัตโนมัติ</p>
-            <p>โปรดไม่ตอบกลับอีเมลนี้</p>
-          </div>
-        </div>
+                <!-- Header -->
+                <tr>
+                  <td class="px" style="padding:22px 28px 0 28px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="font-family:${EMAIL_FONT_STACK}; font-size:12px; font-weight:700; color:#0F766E; letter-spacing:0.04em;">CRM REPORT &middot; แจ้งเตือนสถานะงาน</td>
+                        <td align="right" style="font-family:${EMAIL_FONT_STACK}; font-size:12px; color:#94A3B8; white-space:nowrap;">${escapeHtml(formatThaiDate(new Date()))}</td>
+                      </tr>
+                    </table>
+                    <div style="margin-top:16px; font-family:${EMAIL_FONT_STACK}; font-size:13px; font-weight:700; color:#64748B; letter-spacing:0.02em;">JOB ${jobNo}</div>
+                    <div class="subject" style="margin-top:4px; font-family:${EMAIL_FONT_STACK}; font-size:20px; line-height:1.45; font-weight:700; color:#0F172A;">${subjectHtml}</div>
+                  </td>
+                </tr>
+
+                <!-- Status -->
+                <tr>
+                  <td class="px" style="padding:18px 28px 0 28px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F8FAFC; border:1px solid #E2E8F0; border-left:4px solid ${accentColor}; border-radius:10px; border-collapse:separate;">
+                      <tr>
+                        <td style="padding:14px 16px; font-family:${EMAIL_FONT_STACK};">
+                          <div style="font-size:12px; font-weight:600; color:#64748B; margin-bottom:8px;">${previousStatus ? 'สถานะเปลี่ยนเป็น' : 'สถานะปัจจุบัน'}</div>
+                          <div>${statusChangeHtml}</div>
+                          ${statusHint ? '<div style="margin-top:8px; font-size:13px; color:#334155;">' + escapeHtml(statusHint) + '</div>' : ''}
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Job Details -->
+                <tr>
+                  <td class="px" style="padding:24px 28px 0 28px;">
+                    ${buildEmailSectionTitle('รายละเอียดงาน', '')}
+                    ${buildDetailsTable(rowData, contactMap)}
+                  </td>
+                </tr>
+
+                ${actionButton}
+
+                ${buildFlowTrackingSection(events, contactMap)}
+
+                <tr>
+                  <td style="height:28px; line-height:28px; font-size:0;">&nbsp;</td>
+                </tr>
+              </table>
+
+              <!-- Footer -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;">
+                <tr>
+                  <td align="center" style="padding:16px 12px 0 12px; font-family:${EMAIL_FONT_STACK}; font-size:12px; line-height:1.6; color:#94A3B8;">
+                    อีเมลนี้ส่งอัตโนมัติจากระบบ CRM Report เพื่อแจ้งสถานะงาน<br>โปรดอย่าตอบกลับอีเมลนี้
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       </body>
       </html>
     `;
-    
+
     return html;
   } catch (e) {
     log('Error building email body: ' + e.message, LOG_LEVEL.ERROR);
@@ -410,419 +171,102 @@ function buildStatusSummary(sheet, headerMap, recipientAssignto) {
  */
 function buildDailySummaryEmailBody(recipientId, relatedRows) {
   try {
-    const statusSummary = buildSummaryCardsFromRows(relatedRows);
-    const jobList = buildSummaryJobList(relatedRows, recipientId);
-    const trackedCount = relatedRows.filter((row) => normalizeSummaryStatus(row.status)).length;
+    const contactMap = getEmailContactMap();
     const summaryMetrics = buildSummaryMetrics(relatedRows);
     const today = Utilities.formatDate(new Date(), EMAIL_TIMEZONE, 'dd/MM/yyyy');
-    const contactMap = getEmailContactMap();
-    const prioritySummary = buildPrioritySummary(relatedRows);
-    const recipientDisplayName = formatPersonWithName(recipientId, contactMap);
+    const recipientContact = contactMap[normalizeId(recipientId)];
+    const recipientName = recipientContact && String(recipientContact.name || '').trim()
+      ? String(recipientContact.name).trim()
+      : normalizeId(recipientId);
+    const preheader = 'สรุปงานวันที่ ' + today + ' · ต้องติดตาม ' + summaryMetrics.total + ' เคส';
 
     const html = `
       <!DOCTYPE html>
-      <html>
+      <html lang="th">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="color-scheme" content="light">
+        <meta name="supported-color-schemes" content="light">
+        <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
         <style>
-          body {
-            font-family: 'DM Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.5;
-            color: #16322F;
-            background-color: #EEF6F4;
-            margin: 0;
-            padding: 20px 12px;
-          }
-          .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background-color: #F8FCFB;
-            border: 1px solid #D9EAE6;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 8px 28px rgba(21, 84, 76, 0.08);
-          }
-          .header {
-            background-color: #0F766E;
-            padding: 22px 24px 20px 24px;
-            border-bottom: 4px solid #F2B84B;
-          }
-          .eyebrow {
-            display: inline-block;
-            background: rgba(255,255,255,0.14);
-            border: 1px solid rgba(255,255,255,0.35);
-            border-radius: 999px;
-            color: #FFFFFF;
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 0.08em;
-            padding: 6px 11px;
-          }
-          .title {
-            margin: 12px 0 0 0;
-            color: #FFFFFF;
-            font-size: 21px;
-            line-height: 1.25;
-            font-weight: 800;
-          }
-          .subtitle {
-            margin: 7px 0 0 0;
-            color: rgba(255,255,255,0.82);
-            font-size: 12px;
-          }
-          .content {
-            padding: 22px 24px 24px 24px;
-          }
-          .section {
-            margin-bottom: 24px;
-          }
-          .section h2 {
-            font-size: 15px;
-            border-bottom: 1px solid #D9EAE6;
-            padding-bottom: 9px;
-            margin: 0 0 12px 0;
-            color: #0F766E;
-          }
-          .section-heading {
-            display: table;
-            width: 100%;
-          }
-          .section-heading h2,
-          .section-heading .section-total {
-            display: table-cell;
-            vertical-align: middle;
-          }
-          .section-heading h2 {
-            border-bottom: 0;
-            padding-bottom: 0;
-          }
-          .section-total {
-            text-align: right;
-            color: #0F766E;
-            font-size: 11px;
-            font-weight: 800;
-          }
-          .kpi-grid {
-            display: table;
-            width: 100%;
-            border-spacing: 8px 0;
-            margin: 0 -8px 20px -8px;
-            width: calc(100% + 16px);
-          }
-          .kpi-card {
-            display: table-cell;
-            width: 33.33%;
-            background: #FFFFFF;
-            border: 1px solid #D9EAE6;
-            border-radius: 10px;
-            padding: 11px 12px;
-            vertical-align: middle;
-          }
-          .kpi-label {
-            display: block;
-            color: #6B8C88;
-            font-size: 10px;
-            font-weight: 700;
-            margin-bottom: 4px;
-          }
-          .kpi-value {
-            display: block;
-            color: #0F766E;
-            font-size: 20px;
-            font-weight: 800;
-            line-height: 1;
-          }
-          .priority-panel {
-            background: #FFF9EC;
-            border: 1px solid #F2D28B;
-            border-left: 4px solid #F2B84B;
-            border-radius: 10px;
-            padding: 12px 14px;
-            margin: 0 0 22px 0;
-          }
-          .priority-title {
-            color: #8A5A00;
-            font-size: 13px;
-            font-weight: 800;
-            margin: 0 0 8px 0;
-          }
-          .priority-list {
-            margin: 0;
-            padding-left: 18px;
-          }
-          .priority-list li {
-            color: #5F4A1D;
-            font-size: 12px;
-            padding: 3px 0;
-          }
-          .priority-job {
-            font-weight: 800;
-          }
-          .priority-subject {
-            color: #6B5B38;
-          }
-          .age-badge {
-            display: inline-block;
-            border-radius: 999px;
-            padding: 3px 7px;
-            font-size: 10px;
-            font-weight: 800;
-            white-space: nowrap;
-          }
-          .age-fresh {
-            background: #E7F6ED;
-            color: #1B7A45;
-          }
-          .age-warning {
-            background: #FFF3D6;
-            color: #8A5A00;
-          }
-          .age-critical {
-            background: #FDE3DE;
-            color: #AA2E21;
-          }
-          .status-grid {
-            display: table;
-            width: 100%;
-            border-spacing: 8px 0;
-            margin: 0 -8px;
-            width: calc(100% + 16px);
-          }
-          .status-item {
-            display: table-cell;
-            width: 25%;
-            vertical-align: top;
-            padding: 14px 10px 12px 10px;
-            border-radius: 10px;
-            border: 1px solid rgba(13,30,28,0.10);
-            text-align: center;
-          }
-          .status-item strong {
-            display: block;
-            font-size: 27px;
-            line-height: 1;
-            font-weight: 800;
-            margin-bottom: 7px;
-          }
-          .status-item span {
-            display: block;
-            font-size: 11px;
-            font-weight: 700;
-          }
-          table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            margin-top: 7px;
-            background-color: #FFFFFF;
-            border: 1px solid #D9EAE6;
-            border-radius: 10px;
-            overflow: hidden;
-          }
-          th {
-            background-color: #EFF7F5;
-            padding: 9px 8px;
-            text-align: left;
-            font-size: 11px;
-            color: #47716B;
-            font-weight: 800;
-          }
-          td {
-            padding: 9px 8px;
-            border-top: 1px solid #E8F0EE;
-            font-size: 12px;
-            vertical-align: top;
-          }
-          tr:nth-child(even) td {
-            background-color: #FBFDFC;
-          }
-          .summary-table {
-            table-layout: fixed;
-          }
-          .summary-no {
-            width: 42px;
-            text-align: center;
-          }
-          .summary-job {
-            width: 110px;
-            white-space: nowrap;
-          }
-          .summary-assingto {
-            width: 130px;
-            white-space: nowrap;
-          }
-          .summary-date {
-            width: 138px;
-            white-space: nowrap;
-          }
-          .summary-age {
-            width: 64px;
-            text-align: center;
-            white-space: nowrap;
-          }
-          .summary-subject {
-            width: auto;
-          }
-          a {
-            color: #0F766E;
-            text-decoration: none;
-          }
-          .group-title {
-            display: table;
-            width: 100%;
-            box-sizing: border-box;
-            padding: 11px 13px;
-            border-radius: 10px;
-            font-size: 14px;
-            line-height: 1.25;
-            margin: 20px 0 10px 0;
-          }
-          .group-title-label,
-          .group-count {
-            display: table-cell;
-            vertical-align: middle;
-          }
-          .group-title-label {
-            font-weight: 800;
-          }
-          .group-count {
-            text-align: right;
-            font-size: 11px;
-            font-weight: 800;
-            white-space: nowrap;
-          }
-          .group-title-primary {
-            background-color: #0F766E;
-            color: #FFFFFF;
-            border: 1px solid #0F766E;
-          }
-          .group-title-primary .group-count {
-            color: #FFFFFF;
-            background-color: rgba(255,255,255,0.16);
-            border-radius: 999px;
-            padding: 4px 8px;
-          }
-          .group-title-secondary {
-            background-color: #EFF7F5;
-            color: #35665F;
-            border: 1px solid #CFE3DE;
-          }
-          .group-title-secondary .group-count {
-            color: #0F766E;
-            background-color: #FFFFFF;
-            border: 1px solid #CFE3DE;
-            border-radius: 999px;
-            padding: 4px 8px;
-          }
-          .status-title {
-            font-size: 12px;
-            color: #16322F;
-            margin: 14px 0 6px 0;
-          }
-          .status-text {
-            font-weight: 800;
-          }
-          .muted {
-            color: #6B8C88;
-            font-size: 11px;
-          }
-          .footer {
-            background-color: #E5F2EF;
-            padding: 12px 16px;
-            font-size: 11px;
-            color: #6B8C88;
-            text-align: center;
-          }
+          @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap');
           @media (max-width: 600px) {
-            body {
-              padding: 10px 8px;
-            }
-            .content {
-              padding: 16px 14px 18px 14px;
-            }
-            .kpi-grid {
-              display: block;
-              width: 100%;
-              margin: 0 0 18px 0;
-            }
-            .kpi-card {
-              display: block;
-              width: auto;
-              margin: 0 0 8px 0;
-            }
-            .header {
-              padding: 18px 16px 16px 16px;
-            }
-            .title {
-              font-size: 18px;
-            }
-            .status-grid {
-              display: block;
-              width: 100%;
-              margin: 0;
-            }
-            .status-item {
-              display: block;
-              width: auto;
-              margin: 0 0 8px 0;
-            }
-            th, td {
-              padding: 7px;
-              font-size: 11px;
-            }
-            .summary-table {
-              display: table;
-              table-layout: auto;
-            }
-            .summary-table .summary-assingto,
-            .summary-table .summary-date {
-              display: none;
-            }
-            .summary-table .summary-no {
-              width: 32px;
-            }
-            .summary-table .summary-job {
-              width: 108px;
-              white-space: normal;
-              word-break: break-word;
-            }
-            .summary-table .summary-subject {
-              width: auto;
-              word-break: break-word;
-            }
-            .summary-table .summary-age {
-              width: 62px;
-            }
+            .px { padding-left: 16px !important; padding-right: 16px !important; }
+            .stack { display: block !important; width: 100% !important; box-sizing: border-box; }
+            .stack-gap { padding: 0 0 10px 0 !important; }
+            .hide-sm { display: none !important; }
+            .title { font-size: 20px !important; }
           }
         </style>
       </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <span class="eyebrow">CRM REPORT SUMMARY</span>
-            <div class="title">สรุปรายงานงานที่เกี่ยวข้อง</div>
-            <div class="subtitle">ผู้รับ: ${escapeHtml(recipientDisplayName)} | วันที่รายงาน: ${escapeHtml(today)}</div>
-          </div>
-          <div class="content">
-            ${buildSummaryKpiCards(summaryMetrics)}
-            ${prioritySummary}
-            <div class="section">
-              <div class="section-heading">
-                <h2>สรุปจำนวนเคสตามสถานะ</h2>
-                <span class="section-total">รวม ${escapeHtml(String(trackedCount))} รายการ</span>
-              </div>
-              ${statusSummary}
-            </div>
-            <div class="section">
-              <h2>รายการงานที่ต้องติดตาม</h2>
-              ${jobList}
-            </div>
-          </div>
-          <div class="footer">
-            ข้อความนี้ถูกส่งโดยระบบ CRM Report เพื่อสรุปสถานะงานอัตโนมัติ
-          </div>
-        </div>
+      <body style="margin:0; padding:0; background-color:#F1F5F4; font-family:${EMAIL_FONT_STACK}; color:#0F172A;">
+        <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent;">${escapeHtml(preheader)}</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F1F5F4;">
+          <tr>
+            <td align="center" style="padding:24px 12px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:760px; background-color:#FFFFFF; border:1px solid #E2E8F0; border-radius:14px; border-collapse:separate; overflow:hidden;">
+                <tr>
+                  <td style="height:6px; line-height:6px; font-size:0; background-color:#0F766E;">&nbsp;</td>
+                </tr>
+
+                <!-- Header -->
+                <tr>
+                  <td class="px" style="padding:22px 28px 0 28px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="font-family:${EMAIL_FONT_STACK}; font-size:12px; font-weight:700; color:#0F766E; letter-spacing:0.04em;">CRM REPORT SUMMARY</td>
+                        <td align="right" style="font-family:${EMAIL_FONT_STACK};">
+                          <span style="display:inline-block; padding:4px 12px; border-radius:999px; background-color:#F0FDFA; border:1px solid #CCFBF1; color:#0F766E; font-size:12px; font-weight:600; white-space:nowrap;">${escapeHtml(today)}</span>
+                        </td>
+                      </tr>
+                    </table>
+                    <div class="title" style="margin-top:14px; font-family:${EMAIL_FONT_STACK}; font-size:24px; line-height:1.35; font-weight:700; color:#0F172A;">สรุปงานที่ต้องติดตาม</div>
+                    <div style="margin-top:4px; font-family:${EMAIL_FONT_STACK}; font-size:14px; color:#64748B;">สวัสดีคุณ ${escapeHtml(recipientName)} นี่คือภาพรวมงานที่เกี่ยวข้องกับคุณวันนี้</div>
+                  </td>
+                </tr>
+
+                <!-- KPI -->
+                <tr>
+                  <td class="px" style="padding:20px 28px 0 28px;">
+                    ${buildSummaryKpiCards(summaryMetrics)}
+                  </td>
+                </tr>
+
+                <!-- Status breakdown -->
+                <tr>
+                  <td class="px" style="padding:26px 28px 0 28px;">
+                    ${buildEmailSectionTitle('สรุปตามสถานะ', 'รวม ' + summaryMetrics.total + ' เคส')}
+                    ${buildSummaryCardsFromRows(relatedRows)}
+                  </td>
+                </tr>
+
+                ${buildPrioritySummary(relatedRows)}
+
+                <!-- Job list -->
+                <tr>
+                  <td class="px" style="padding:26px 28px 0 28px;">
+                    ${buildEmailSectionTitle('รายการงานที่ต้องติดตาม', 'เรียงจากเคสที่ค้างนานที่สุด')}
+                    ${buildSummaryJobList(relatedRows, recipientId)}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style="height:28px; line-height:28px; font-size:0;">&nbsp;</td>
+                </tr>
+              </table>
+
+              <!-- Footer -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:760px;">
+                <tr>
+                  <td align="center" style="padding:16px 12px 0 12px; font-family:${EMAIL_FONT_STACK}; font-size:12px; line-height:1.6; color:#94A3B8;">
+                    อีเมลนี้ส่งอัตโนมัติจากระบบ CRM Report เพื่อสรุปสถานะงานประจำวัน<br>โปรดอย่าตอบกลับอีเมลนี้
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       </body>
       </html>
     `;
@@ -965,29 +409,43 @@ function buildSummaryMetrics(rows) {
  * @return {string} HTML KPI cards
  */
 function buildSummaryKpiCards(metrics) {
+  const oldestColor = metrics.oldest === '-'
+    ? '#0F172A'
+    : getCaseAgeColors(Number(metrics.oldest)).text;
+  const cards = [
+    { label: 'เคสที่ต้องติดตาม', value: metrics.total, unit: 'เคส', color: '#0F766E' },
+    { label: 'เคสค้างนานสุด', value: metrics.oldest, unit: metrics.oldest === '-' ? '' : 'วัน', color: oldestColor },
+    { label: 'เคสที่แจ้งวันนี้', value: metrics.newToday, unit: 'เคส', color: '#2563EB' }
+  ];
+  let cellsHtml = '';
+
+  cards.forEach((card, index) => {
+    const gap = index < cards.length - 1 ? 'padding-right:10px;' : '';
+    cellsHtml += `
+      <td class="stack stack-gap" width="33%" valign="top" style="${gap}">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; border-collapse:separate;">
+          <tr>
+            <td style="padding:14px 16px; font-family:${EMAIL_FONT_STACK};">
+              <div style="font-size:12px; color:#64748B;">${escapeHtml(card.label)}</div>
+              <div style="margin-top:4px; font-size:28px; line-height:1.15; font-weight:700; color:${card.color};">${escapeHtml(String(card.value))}<span style="font-size:13px; font-weight:500; color:#64748B;"> ${escapeHtml(card.unit)}</span></div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    `;
+  });
+
   return `
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <span class="kpi-label">เคสที่ต้องติดตาม</span>
-        <span class="kpi-value">${escapeHtml(String(metrics.total))}</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-label">เคสเก่าสุด (วัน)</span>
-        <span class="kpi-value">${escapeHtml(String(metrics.oldest))}</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-label">เคสที่แจ้งวันนี้</span>
-        <span class="kpi-value">${escapeHtml(String(metrics.newToday))}</span>
-      </div>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>${cellsHtml}</tr>
+    </table>
   `;
 }
 
 /**
  * สร้างกลุ่มเคสที่ควรติดตามก่อน โดยเลือกจากอายุเคสมากที่สุด
  * @param {Array<Object>} rows - รายการงานที่เกี่ยวข้อง
- * @param {Object} contactMap - map รายชื่อผู้ติดต่อ
- * @return {string} HTML priority panel
+ * @return {string} HTML table row หรือค่าว่างถ้าไม่มีเคส
  */
 function buildPrioritySummary(rows) {
   const priorityRows = rows
@@ -999,41 +457,48 @@ function buildPrioritySummary(rows) {
     return '';
   }
 
-  let html = `
-    <div class="priority-panel">
-      <div class="priority-title">เคสที่ควรติดตามก่อน</div>
-      <ol class="priority-list">
-  `;
+  let itemsHtml = '';
 
-  priorityRows.forEach((row) => {
-    const age = getCaseAgeDays(row.contactDate);
-    html += `
-      <li>
-        <div class="priority-job">
-          ${buildJobLinkHtml(row.jobNo, row.jobNo, '')}
-          <span class="age-badge ${getCaseAgeClass(row.contactDate)}">${escapeHtml(age || '-')} วัน</span>
-        </div>
-        <div class="priority-subject">${escapeHtml(truncateText(row.subject, 110))} · ${escapeHtml(normalizeSummaryStatus(row.status))}</div>
-      </li>
+  priorityRows.forEach((row, index) => {
+    const rowBorder = index > 0 ? 'border-top:1px solid #FDE68A;' : '';
+    itemsHtml += `
+      <tr>
+        <td width="34" valign="top" style="padding:12px 0 12px 16px; ${rowBorder}">
+          <div style="width:24px; height:24px; border-radius:12px; background-color:#D97706; color:#FFFFFF; font-family:${EMAIL_FONT_STACK}; font-size:12px; font-weight:700; line-height:24px; text-align:center;">${index + 1}</div>
+        </td>
+        <td valign="top" style="padding:12px 10px; ${rowBorder} font-family:${EMAIL_FONT_STACK};">
+          <div style="font-size:14px; font-weight:700; color:#0F172A;">${buildJobLinkHtml(row.jobNo, row.jobNo, '')}</div>
+          <div style="margin-top:2px; font-size:13px; line-height:1.5; color:#475569;">${escapeHtml(truncateText(row.subject, 110))}</div>
+        </td>
+        <td width="1" align="right" valign="top" style="padding:12px 16px 12px 0; ${rowBorder} white-space:nowrap;">
+          ${buildStatusBadgeHtml(normalizeSummaryStatus(row.status), false)}
+          <div style="margin-top:6px;">${buildCaseAgeBadgeHtml(row.contactDate)}</div>
+        </td>
+      </tr>
     `;
   });
 
-  html += `
-      </ol>
-    </div>
+  return `
+    <tr>
+      <td class="px" style="padding:26px 28px 0 28px;">
+        ${buildEmailSectionTitle('เคสที่ควรติดตามก่อน', 'ค้างนานที่สุด ' + priorityRows.length + ' อันดับ')}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; border-collapse:separate;">
+          ${itemsHtml}
+        </table>
+      </td>
+    </tr>
   `;
-
-  return html;
 }
 
 /**
- * สร้าง card สรุปสถานะ 4 สถานะหลักจากรายการงาน
+ * สร้าง card สรุปสถานะ 4 สถานะหลักจากรายการงาน พร้อมแถบสัดส่วน
  * @param {Array<Object>} rows - รายการงาน
  * @return {string} HTML card summary
  */
 function buildSummaryCardsFromRows(rows) {
   const summary = {};
   const statuses = ['Open', 'Continue', 'EditErr', 'Test'];
+  let total = 0;
 
   statuses.forEach((status) => {
     summary[status] = 0;
@@ -1043,28 +508,54 @@ function buildSummaryCardsFromRows(rows) {
     const status = normalizeSummaryStatus(row.status);
     if (status) {
       summary[status]++;
+      total++;
     }
   });
 
-  let html = '<div class="status-grid">';
-  statuses.forEach((status) => {
-    const color = getStatusColor(status);
-    const textColor = getStatusTextColor(status);
-    html += `
-      <div class="status-item" style="background-color:${color}; color:${textColor};">
-        <strong style="color:${textColor};">${summary[status]}</strong>
-        <span style="color:${textColor};">${escapeHtml(status)}</span>
-      </div>
+  let barHtml = '';
+  if (total > 0) {
+    statuses.forEach((status) => {
+      if (summary[status] > 0) {
+        const percent = Math.max(1, Math.round((summary[status] / total) * 100));
+        barHtml += '<td width="' + percent + '%" style="height:8px; line-height:8px; font-size:0; background-color:' + getStatusAccentColor(status) + ';">&nbsp;</td>';
+      }
+    });
+  } else {
+    barHtml = '<td style="height:8px; line-height:8px; font-size:0; background-color:#E2E8F0;">&nbsp;</td>';
+  }
+
+  let cellsHtml = '';
+  statuses.forEach((status, index) => {
+    const gap = index < statuses.length - 1 ? 'padding-right:10px;' : '';
+    const isEmpty = summary[status] === 0;
+    cellsHtml += `
+      <td class="stack stack-gap" width="25%" valign="top" style="${gap}">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${getStatusColor(status)}; border-radius:10px; border-collapse:separate; ${isEmpty ? 'opacity:0.6;' : ''}">
+          <tr>
+            <td style="padding:12px 14px; border-left:4px solid ${getStatusAccentColor(status)}; border-radius:10px; font-family:${EMAIL_FONT_STACK};">
+              <div style="font-size:26px; line-height:1.15; font-weight:700; color:${getStatusTextColor(status)};">${summary[status]}</div>
+              <div style="margin-top:2px; font-size:13px; font-weight:600; color:${getStatusTextColor(status)};">${escapeHtml(status)}</div>
+            </td>
+          </tr>
+        </table>
+      </td>
     `;
   });
-  html += '</div>';
 
-  return html;
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-radius:999px; border-collapse:separate; overflow:hidden; margin-bottom:12px;">
+      <tr>${barHtml}</tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>${cellsHtml}</tr>
+    </table>
+  `;
 }
 
 /**
  * สร้างตารางรายการงานสำหรับอีเมล summary
  * @param {Array<Object>} rows - รายการงาน
+ * @param {string} recipientId - ID ผู้รับรายงาน
  * @return {string} HTML table
  */
 function buildSummaryJobList(rows, recipientId) {
@@ -1076,10 +567,10 @@ function buildSummaryJobList(rows, recipientId) {
   const normalizedRecipientId = normalizeId(recipientId);
 
   if (trackedRows.length === 0) {
-    return '<p class="muted">ไม่มีรายการในสถานะ Open, Continue, EditErr หรือ Test</p>';
+    return '<div style="padding:24px 16px; border:1px dashed #CBD5E1; border-radius:10px; text-align:center; font-family:' + EMAIL_FONT_STACK + '; font-size:14px; color:#64748B;">ไม่มีงานในสถานะ Open, Continue, EditErr หรือ Test</div>';
   }
 
-  let html = '<p class="muted">เรียงจากเคสที่มีอายุสูงสุด เพื่อช่วยจัดลำดับการติดตาม</p>';
+  let html = '';
   const assingtoMatchedRows = normalizedRecipientId
     ? trackedRows.filter((row) => normalizeId(row.assignto) === normalizedRecipientId)
     : [];
@@ -1088,11 +579,11 @@ function buildSummaryJobList(rows, recipientId) {
     : trackedRows;
 
   if (assingtoMatchedRows.length > 0) {
-    html += buildSummaryJobGroup('ผู้รับผิดชอบตรงกับผู้รับอีเมล', assingtoMatchedRows, statuses, contactMap, 'primary');
+    html += buildSummaryJobGroup('งานที่คุณเป็นผู้รับผิดชอบ', assingtoMatchedRows, statuses, contactMap, 'primary');
   }
 
   if (otherRelatedRows.length > 0) {
-    const title = assingtoMatchedRows.length > 0 ? 'งานเกี่ยวข้องอื่น' : 'รายการงาน';
+    const title = assingtoMatchedRows.length > 0 ? 'งานอื่นที่เกี่ยวข้อง' : 'รายการงาน';
     html += buildSummaryJobGroup(title, otherRelatedRows, statuses, contactMap, 'secondary');
   }
 
@@ -1109,12 +600,20 @@ function buildSummaryJobList(rows, recipientId) {
  * @return {string} HTML table/card group
  */
 function buildSummaryJobGroup(title, rows, statuses, contactMap, groupVariant) {
-  const safeVariant = groupVariant === 'primary' ? 'primary' : 'secondary';
+  const isPrimary = groupVariant === 'primary';
+  const headerBackground = isPrimary ? '#0F766E' : '#F1F5F9';
+  const headerColor = isPrimary ? '#FFFFFF' : '#334155';
+  const countBackground = isPrimary ? '#115E59' : '#FFFFFF';
+  const countColor = isPrimary ? '#FFFFFF' : '#0F766E';
   let html = `
-    <h3 class="group-title group-title-${safeVariant}">
-      <span class="group-title-label">${escapeHtml(title)}</span>
-      <span class="group-count">${rows.length} เคส</span>
-    </h3>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 4px 0; background-color:${headerBackground}; border-radius:10px; border-collapse:separate;">
+      <tr>
+        <td style="padding:11px 16px; font-family:${EMAIL_FONT_STACK}; font-size:15px; font-weight:700; color:${headerColor};">${escapeHtml(title)}</td>
+        <td align="right" style="padding:11px 16px; font-family:${EMAIL_FONT_STACK};">
+          <span style="display:inline-block; padding:3px 10px; border-radius:999px; background-color:${countBackground}; color:${countColor}; font-size:12px; font-weight:700; white-space:nowrap;">${rows.length} เคส</span>
+        </td>
+      </tr>
+    </table>
   `;
 
   statuses.forEach((status) => {
@@ -1124,27 +623,34 @@ function buildSummaryJobGroup(title, rows, statuses, contactMap, groupVariant) {
     }
 
     html += `
-      <h3 class="status-title">${escapeHtml(status)} (${statusRows.length})</h3>
-      <table class="summary-table">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;">
         <tr>
-          <th class="summary-no">ลำดับ</th>
-          <th class="summary-job">Job No</th>
-          <th class="summary-subject">เรื่องที่แจ้ง</th>
-          <th class="summary-assingto">ผู้รับผิดชอบ</th>
-          <th class="summary-date">วันที่แจ้ง</th>
-          <th class="summary-age">จำนวนวัน</th>
+          <td style="padding:0 0 8px 2px; font-family:${EMAIL_FONT_STACK}; font-size:13px; font-weight:700; color:#334155;">
+            <span style="display:inline-block; width:8px; height:8px; border-radius:4px; background-color:${getStatusAccentColor(status)}; margin-right:6px; vertical-align:middle;"></span>${escapeHtml(status)}
+            <span style="font-weight:400; color:#94A3B8;">&nbsp;· ${statusRows.length} เคส</span>
+          </td>
+        </tr>
+      </table>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E2E8F0; border-radius:10px; border-collapse:separate; overflow:hidden;">
+        <tr>
+          <th align="left" style="padding:9px 14px; background-color:#F8FAFC; border-bottom:1px solid #E2E8F0; font-family:${EMAIL_FONT_STACK}; font-size:12px; font-weight:600; color:#64748B;">งาน</th>
+          <th class="hide-sm" width="150" align="left" style="padding:9px 10px; background-color:#F8FAFC; border-bottom:1px solid #E2E8F0; font-family:${EMAIL_FONT_STACK}; font-size:12px; font-weight:600; color:#64748B; white-space:nowrap;">ผู้รับผิดชอบ</th>
+          <th class="hide-sm" width="130" align="left" style="padding:9px 10px; background-color:#F8FAFC; border-bottom:1px solid #E2E8F0; font-family:${EMAIL_FONT_STACK}; font-size:12px; font-weight:600; color:#64748B; white-space:nowrap;">วันที่แจ้ง</th>
+          <th width="70" align="right" style="padding:9px 14px; background-color:#F8FAFC; border-bottom:1px solid #E2E8F0; font-family:${EMAIL_FONT_STACK}; font-size:12px; font-weight:600; color:#64748B; white-space:nowrap;">ค้างมา</th>
         </tr>
     `;
 
     statusRows.forEach((row, index) => {
+      const rowBorder = index > 0 ? 'border-top:1px solid #F1F5F9;' : '';
       html += `
         <tr>
-          <td class="summary-no">${index + 1}</td>
-          <td class="summary-job">${buildJobLinkHtml(row.jobNo, row.jobNo, '')}</td>
-          <td class="summary-subject">${buildJobLinkHtml(row.jobNo, truncateText(row.subject, 90), '')}</td>
-          <td class="summary-assingto">${escapeHtml(formatPersonWithName(row.assignto, contactMap) || '-')}</td>
-          <td class="summary-date">${escapeHtml(formatSummaryContactDate(row.contactDate))}</td>
-          <td class="summary-age"><span class="age-badge ${getCaseAgeClass(row.contactDate)}">${escapeHtml(getCaseAgeDays(row.contactDate) || '-')} วัน</span></td>
+          <td valign="top" style="padding:11px 14px; ${rowBorder} font-family:${EMAIL_FONT_STACK};">
+            <div style="font-size:13px; font-weight:700; color:#0F172A;">${buildJobLinkHtml(row.jobNo, row.jobNo, '')}</div>
+            <div style="margin-top:2px; font-size:13px; line-height:1.5; color:#475569;">${escapeHtml(truncateText(row.subject, 90))}</div>
+          </td>
+          <td class="hide-sm" valign="top" style="padding:11px 10px; ${rowBorder} font-family:${EMAIL_FONT_STACK}; font-size:13px; color:#334155;">${buildPersonHtml(row.assignto, contactMap)}</td>
+          <td class="hide-sm" valign="top" style="padding:11px 10px; ${rowBorder} font-family:${EMAIL_FONT_STACK}; font-size:12px; color:#64748B; white-space:nowrap;">${escapeHtml(formatSummaryContactDate(row.contactDate) || '-')}</td>
+          <td align="right" valign="top" style="padding:11px 14px; ${rowBorder} white-space:nowrap;">${buildCaseAgeBadgeHtml(row.contactDate)}</td>
         </tr>
       `;
     });
@@ -1156,61 +662,74 @@ function buildSummaryJobGroup(title, rows, statuses, contactMap, groupVariant) {
 }
 
 /**
+ * สีของ badge อายุเคส
+ * @param {number} age - จำนวนวัน
+ * @return {Object} { background, text }
+ */
+function getCaseAgeColors(age) {
+  if (isNaN(age) || age >= 8 && age < 30) {
+    return { background: '#FEF3C7', text: '#B45309' };
+  }
+
+  if (age >= 30) {
+    return { background: '#FEE2E2', text: '#B91C1C' };
+  }
+
+  return { background: '#DCFCE7', text: '#15803D' };
+}
+
+/**
+ * สร้าง badge แสดงจำนวนวันที่เคสค้าง
+ * @param {*} contactDate - วันที่แจ้ง
+ * @return {string} HTML
+ */
+function buildCaseAgeBadgeHtml(contactDate) {
+  const ageText = getCaseAgeDays(contactDate);
+  const colors = getCaseAgeColors(ageText === '' ? NaN : Number(ageText));
+
+  return '<span style="display:inline-block; padding:3px 10px; border-radius:999px; background-color:' + colors.background + '; color:' + colors.text + '; font-family:' + EMAIL_FONT_STACK + '; font-size:12px; font-weight:700; white-space:nowrap;">' + escapeHtml(ageText || '-') + ' วัน</span>';
+}
+
+/**
  * สร้าง HTML table ของรายละเอียดงาน
  * @param {Object} rowData - ข้อมูลแถว
+ * @param {Object} contactMap - map รหัสพนักงาน -> ข้อมูลติดต่อ (ถ้าไม่ส่งจะดึงเอง)
  * @return {string} HTML table
  */
-function buildDetailsTable(rowData) {
+function buildDetailsTable(rowData, contactMap) {
   try {
-    const contactMap = getEmailContactMap();
-    const statusColor = getStatusColor(rowData.status);
-    const statusTextColor = getStatusTextColor(rowData.status);
-    const html = `
-      <table class="detail-table" role="presentation" cellpadding="0" cellspacing="0">
+    const contacts = contactMap || getEmailContactMap();
+    const fields = [
+      ['ผู้แจ้ง', buildPersonHtml(rowData.ownerSubjectId, contacts)],
+      ['วันที่แจ้ง', escapeHtml(formatSummaryContactDate(rowData.contactDate) || '-')],
+      ['ผู้รับผิดชอบ', buildPersonHtml(rowData.assignto, contacts)],
+      ['DEV', buildPersonHtml(rowData.sysDevelop, contacts)],
+      ['ประเภทบริการ', escapeHtml(rowData.sysserViceTypeName || '-')],
+      ['โปรแกรม', escapeHtml(rowData.productName || '-')]
+    ];
+    let rowsHtml = '';
+
+    for (let i = 0; i < fields.length; i += 2) {
+      const rowBorder = i > 0 ? 'border-top:1px solid #F1F5F9;' : '';
+      rowsHtml += `
         <tr>
-          <td class="detail-cell detail-cell-left">
-            <span class="detail-label">JOB NO</span>
-            <span class="detail-value">${buildJobLinkHtml(rowData.jobNo, rowData.jobNo, '')}</span>
+          <td class="stack" width="50%" valign="top" style="padding:12px 16px; ${rowBorder} font-family:${EMAIL_FONT_STACK};">
+            <div style="font-size:12px; color:#64748B; margin-bottom:3px;">${fields[i][0]}</div>
+            <div style="font-size:14px; font-weight:600; line-height:1.45; color:#0F172A;">${fields[i][1]}</div>
           </td>
-          <td class="detail-cell">
-            <span class="detail-label">สถานะปัจจุบัน</span>
-            <span class="detail-value"><span class="inline-status" style="background-color:${statusColor}; color:${statusTextColor};">${escapeHtml(rowData.status || '-')}</span></span>
+          <td class="stack stack-right" width="50%" valign="top" style="padding:12px 16px; ${rowBorder} border-left:1px solid #F1F5F9; font-family:${EMAIL_FONT_STACK};">
+            <div style="font-size:12px; color:#64748B; margin-bottom:3px;">${fields[i + 1][0]}</div>
+            <div style="font-size:14px; font-weight:600; line-height:1.45; color:#0F172A;">${fields[i + 1][1]}</div>
           </td>
         </tr>
-        <tr>
-          <td class="detail-cell detail-cell-left">
-            <span class="detail-label">ผู้แจ้ง</span>
-            <span class="detail-value">${escapeHtml(formatPersonWithName(rowData.ownerSubjectId, contactMap) || '-')}</span>
-          </td>
-          <td class="detail-cell">
-            <span class="detail-label">วันที่แจ้ง</span>
-            <span class="detail-value">${escapeHtml(formatSummaryContactDate(rowData.contactDate) || '-')}</span>
-          </td>
-        </tr>
-        <tr>
-          <td class="detail-cell detail-cell-left">
-            <span class="detail-label">ผู้รับผิดชอบ</span>
-            <span class="detail-value">${escapeHtml(formatPersonWithName(rowData.assignto, contactMap) || '-')}</span>
-          </td>
-          <td class="detail-cell">
-            <span class="detail-label">DEV</span>
-            <span class="detail-value">${escapeHtml(formatPersonWithName(rowData.sysDevelop, contactMap) || '-')}</span>
-          </td>
-        </tr>
-        <tr>
-          <td class="detail-cell detail-cell-left">
-            <span class="detail-label">ประเภทบริการ</span>
-            <span class="detail-value">${escapeHtml(rowData.sysserViceTypeName || '-')}</span>
-          </td>
-          <td class="detail-cell">
-            <span class="detail-label">โปรแกรม</span>
-            <span class="detail-value">${escapeHtml(rowData.productName || '-')}</span>
-          </td>
-        </tr>
+      `;
+    }
+
+    return `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E2E8F0; border-radius:10px; border-collapse:separate;">
+        ${rowsHtml}
       </table>
     `;
-    
-    return html;
   } catch (e) {
     log('Error building details table: ' + e.message, LOG_LEVEL.ERROR);
     return '<p>Error generating details table</p>';
@@ -1218,74 +737,194 @@ function buildDetailsTable(rowData) {
 }
 
 /**
- * สร้างส่วน Flow Tracking สำหรับเมลแจ้งสถานะงาน
- * @param {Sheet} sheet - Sheet object
- * @param {number} rowIndex - หมายเลขแถว
- * @param {Object} rowData - ข้อมูลแถว
- * @param {Object} headerMap - Header map
- * @return {string} HTML section
+ * สร้างส่วนประวัติการเปลี่ยนสถานะ (Flow Tracking) สำหรับเมลแจ้งสถานะงาน
+ * แสดงรายการล่าสุดก่อน และจำกัดจำนวนตาม EMAIL_FLOW_MAX_EVENTS
+ * @param {Array} events - รายการ flow tracking เรียงจากเก่าไปใหม่
+ * @param {Object} contactMap - map รหัสพนักงาน -> ข้อมูลติดต่อ
+ * @return {string} HTML table rows หรือค่าว่างถ้าไม่มีข้อมูล
  */
-function buildFlowTrackingSection(sheet, rowIndex, rowData, headerMap) {
+function buildFlowTrackingSection(events, contactMap) {
   try {
-    let events = getFlowTrackingEventsFromSheet(rowData && rowData.jobNo);
-
-    if (events.length === 0) {
-      const flowTrackingText = getFlowTrackingText(sheet, rowIndex, rowData, headerMap);
-      events = parseFlowTrackingEvents(flowTrackingText);
-    }
-
-    if (events.length === 0) {
+    if (!events || events.length === 0) {
       return '';
     }
 
-    const contactMap = getEmailContactMap();
-    const latest = events[events.length - 1];
-    const latestStatusColor = getStatusColor(latest.status);
-    const latestStatusTextColor = getStatusTextColor(latest.status);
-    let html = `
-      <div class="section section-card">
-        <h2>การติดตาม Flow งาน</h2>
-        <div class="flow-latest">
-          <div class="flow-latest-label">สถานะล่าสุด</div>
-          <div><span class="flow-latest-status" style="background-color:${latestStatusColor}; color:${latestStatusTextColor};">${escapeHtml(latest.status || '-')}</span></div>
-          <div class="flow-latest-people">
-            ผู้รับผิดชอบ: ${escapeHtml(formatPersonWithName(latest.assignto, contactMap) || '-')}<br>
-            DEV: ${escapeHtml(formatPersonWithName(latest.sysDevelop, contactMap) || '-')}
-          </div>
-          <div class="flow-latest-time">อัปเดตเมื่อ ${escapeHtml(formatFlowTrackingTimestamp(latest.timestamp))}</div>
-        </div>
-        <table class="flow-table">
-          <tr>
-            <th class="flow-no">#</th>
-            <th class="flow-time">วันและเวลา</th>
-            <th class="flow-status">สถานะ</th>
-            <th>ผู้รับแจ้ง</th>
-            <th>DEV</th>
-          </tr>
-    `;
+    const recentEvents = events.slice(-EMAIL_FLOW_MAX_EVENTS).reverse();
+    const countLabel = events.length > recentEvents.length
+      ? 'แสดง ' + recentEvents.length + ' จาก ' + events.length + ' รายการ'
+      : events.length + ' รายการ';
+    let rowsHtml = '';
 
-    events.forEach((event, index) => {
-      html += `
+    recentEvents.forEach((event, index) => {
+      const isLatest = index === 0;
+      const rowBorder = index > 0 ? 'border-top:1px solid #F1F5F9;' : '';
+      const rowBackground = isLatest ? 'background-color:#F8FAFC;' : '';
+      const latestTag = isLatest
+        ? '<span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:999px; background-color:#0F766E; color:#FFFFFF; font-size:11px; font-weight:700; vertical-align:middle;">ล่าสุด</span>'
+        : '';
+
+      rowsHtml += `
         <tr>
-          <td class="flow-no">${index + 1}</td>
-          <td class="flow-time">${escapeHtml(formatFlowTrackingTimestamp(event.timestamp))}</td>
-          <td class="flow-status"><strong>${escapeHtml(event.status || '-')}</strong></td>
-          <td>${escapeHtml(formatPersonWithName(event.assignto, contactMap) || '-')}</td>
-          <td>${escapeHtml(formatPersonWithName(event.sysDevelop, contactMap) || '-')}</td>
+          <td width="28" valign="top" style="padding:16px 0 14px 16px; ${rowBorder} ${rowBackground}">
+            <div style="width:10px; height:10px; border-radius:5px; background-color:${getStatusAccentColor(event.status)}; font-size:0; line-height:0;">&nbsp;</div>
+          </td>
+          <td valign="top" style="padding:12px 16px 12px 6px; ${rowBorder} ${rowBackground} font-family:${EMAIL_FONT_STACK};">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="font-family:${EMAIL_FONT_STACK};">${buildStatusBadgeHtml(event.status || '-', !isLatest)}${latestTag}</td>
+                <td align="right" style="font-family:${EMAIL_FONT_STACK}; font-size:12px; color:#94A3B8; white-space:nowrap;">${escapeHtml(formatFlowTrackingTimestamp(event.timestamp))}</td>
+              </tr>
+            </table>
+            <div style="margin-top:6px; font-size:13px; line-height:1.55; color:#475569;">
+              ผู้รับผิดชอบ: ${buildPersonHtml(event.assignto, contactMap)}<br>
+              DEV: ${buildPersonHtml(event.sysDevelop, contactMap)}
+            </div>
+          </td>
         </tr>
       `;
     });
 
-    html += `
-        </table>
-      </div>
+    return `
+      <tr>
+        <td class="px" style="padding:28px 28px 0 28px;">
+          ${buildEmailSectionTitle('ประวัติการเปลี่ยนสถานะ', countLabel)}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E2E8F0; border-radius:10px; border-collapse:separate; overflow:hidden;">
+            ${rowsHtml}
+          </table>
+        </td>
+      </tr>
     `;
-
-    return html;
   } catch (e) {
     log('Error building flow tracking section: ' + e.message, LOG_LEVEL.WARNING);
     return '';
   }
+}
+
+/**
+ * ดึงรายการ Flow Tracking ของงาน จากชีต FLOW_TRACKING ก่อน แล้วค่อย fallback เป็นคอลัมน์ flowTracking เดิม
+ * @param {Sheet} sheet - Sheet object
+ * @param {number} rowIndex - หมายเลขแถว
+ * @param {Object} rowData - ข้อมูลแถว
+ * @param {Object} headerMap - Header map
+ * @return {Array} รายการ event เรียงจากเก่าไปใหม่
+ */
+function getFlowTrackingEventsForEmail(sheet, rowIndex, rowData, headerMap) {
+  try {
+    const events = getFlowTrackingEventsFromSheet(rowData && rowData.jobNo);
+
+    if (events.length > 0) {
+      return events;
+    }
+
+    return parseFlowTrackingEvents(getFlowTrackingText(sheet, rowIndex, rowData, headerMap));
+  } catch (e) {
+    log('Error getting flow tracking events: ' + e.message, LOG_LEVEL.WARNING);
+    return [];
+  }
+}
+
+/**
+ * หาสถานะก่อนหน้าที่ต่างจากสถานะปัจจุบัน เพื่อแสดงการเปลี่ยนสถานะ
+ * @param {Array} events - รายการ flow tracking เรียงจากเก่าไปใหม่
+ * @param {string} currentStatus - สถานะปัจจุบัน
+ * @return {string} สถานะก่อนหน้า หรือค่าว่างถ้าไม่มี
+ */
+function getPreviousFlowStatus(events, currentStatus) {
+  const current = String(currentStatus || '').trim().toLowerCase();
+
+  for (let i = (events || []).length - 1; i >= 0; i--) {
+    const status = String(events[i].status || '').trim();
+
+    if (status && status.toLowerCase() !== current) {
+      return status;
+    }
+  }
+
+  return '';
+}
+
+/**
+ * สร้างหัวข้อ section ของเมลแจ้งสถานะงาน
+ * @param {string} title - ชื่อหัวข้อ
+ * @param {string} note - ข้อความเสริมด้านขวา
+ * @return {string} HTML
+ */
+function buildEmailSectionTitle(title, note) {
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:10px;">
+      <tr>
+        <td style="font-family:${EMAIL_FONT_STACK}; font-size:15px; font-weight:700; color:#0F172A;">${escapeHtml(title)}</td>
+        <td align="right" style="font-family:${EMAIL_FONT_STACK}; font-size:12px; color:#94A3B8;">${escapeHtml(note || '')}</td>
+      </tr>
+    </table>
+  `;
+}
+
+/**
+ * สร้าง badge สถานะแบบ inline style
+ * @param {string} status - สถานะ
+ * @param {boolean} muted - true เพื่อแสดงแบบจาง (สถานะเดิม)
+ * @return {string} HTML
+ */
+function buildStatusBadgeHtml(status, muted) {
+  const background = getStatusColor(status);
+  const border = background === '#FFFFFF' ? '#CBD5E1' : background;
+  const opacity = muted ? 'opacity:0.7;' : '';
+
+  return '<span style="display:inline-block; padding:5px 12px; border-radius:999px; border:1px solid ' + border + '; background-color:' + background + '; color:' + getStatusTextColor(status) + '; font-family:' + EMAIL_FONT_STACK + '; font-size:13px; font-weight:700; line-height:1.2; vertical-align:middle; ' + opacity + '">' + escapeHtml(status || '-') + '</span>';
+}
+
+/**
+ * แสดงชื่อพนักงานพร้อมรหัสแบบจาง เช่น สมชาย (6101)
+ * @param {*} personId - รหัสพนักงาน
+ * @param {Object} contactMap - map รหัสพนักงาน -> ข้อมูลติดต่อ
+ * @return {string} HTML ที่ escape แล้ว
+ */
+function buildPersonHtml(personId, contactMap) {
+  const id = String(personId || '').trim();
+
+  if (!id) {
+    return '<span style="color:#94A3B8; font-weight:400;">-</span>';
+  }
+
+  const contact = contactMap && contactMap[id];
+  const name = contact ? String(contact.name || '').trim() : '';
+
+  return name
+    ? escapeHtml(name) + ' <span style="color:#94A3B8; font-weight:400;">(' + escapeHtml(id) + ')</span>'
+    : escapeHtml(id);
+}
+
+/**
+ * สีหลักของแต่ละสถานะ ใช้กับแถบด้านบน เส้นขอบ และจุดใน timeline
+ * @param {string} status - สถานะ
+ * @return {string} CSS color
+ */
+function getStatusAccentColor(status) {
+  const accentMap = {
+    'open': '#64748B',
+    'continue': '#D97706',
+    'editerr': '#DC2626',
+    'test': '#2563EB'
+  };
+
+  return accentMap[String(status || '').trim().toLowerCase()] || '#0F766E';
+}
+
+/**
+ * คำอธิบายสั้นๆ ของแต่ละสถานะ
+ * @param {string} status - สถานะ
+ * @return {string} ข้อความ หรือค่าว่างถ้าไม่มี
+ */
+function getStatusHint(status) {
+  const hintMap = {
+    'open': 'งานใหม่เข้าระบบ รอดำเนินการ',
+    'continue': 'งานอยู่ระหว่างดำเนินการ',
+    'editerr': 'งานถูกส่งกลับให้แก้ไข',
+    'test': 'งานพร้อมให้ทดสอบ'
+  };
+
+  return hintMap[String(status || '').trim().toLowerCase()] || '';
 }
 
 /**
@@ -1639,35 +1278,6 @@ function getCaseAgeDays(value) {
   }
 
   return String(Math.floor(diffMs / (24 * 60 * 60 * 1000)));
-}
-
-/**
- * คืน class สีตามอายุเคสสำหรับใช้เป็น badge ใน Report Summary
- * @param {*} value - วันที่แจ้ง
- * @return {string} CSS class
- */
-function getCaseAgeClass(value) {
-  const ageText = getCaseAgeDays(value);
-
-  if (ageText === '') {
-    return 'age-warning';
-  }
-
-  const age = Number(ageText);
-
-  if (isNaN(age)) {
-    return 'age-warning';
-  }
-
-  if (age >= 30) {
-    return 'age-critical';
-  }
-
-  if (age >= 8) {
-    return 'age-warning';
-  }
-
-  return 'age-fresh';
 }
 
 /**
