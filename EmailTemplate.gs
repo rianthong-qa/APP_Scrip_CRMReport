@@ -25,6 +25,10 @@ function buildEmailBody(sheet, rowIndex, rowData, headerMap) {
     const headerStatusTextColor = getStatusTextColor(rowData.status);
     const headerSubject = buildJobLinkHtml(rowData.jobNo, rowData.subject, 'header-subject');
     const headerStatus = escapeHtml(rowData.status || 'STATUS');
+    const jobUrl = buildJobDetailUrl(rowData.jobNo);
+    const jobAction = jobUrl
+      ? '<a class="action-button" href="' + escapeHtml(jobUrl) + '" target="_blank" rel="noopener noreferrer">เปิดรายละเอียดงาน&nbsp; →</a>'
+      : '';
     
     const html = `
       <!DOCTYPE html>
@@ -35,27 +39,39 @@ function buildEmailBody(sheet, rowIndex, rowData, headerMap) {
         <style>
           body {
             font-family: 'DM Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.45;
-            color: #0D1E1C;
-            background-color: #E8F4F2;
+            line-height: 1.5;
+            color: #16322F;
+            background-color: #EEF6F4;
             margin: 0;
-            padding: 12px;
+            padding: 20px 12px;
           }
           .container {
-            max-width: 560px;
+            max-width: 680px;
             margin: 0 auto;
-            background-color: #F4FAFA;
-            border: 1px solid rgba(26,122,110,0.15);
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(13,30,28,0.08);
+            background-color: #F8FCFB;
+            border: 1px solid #D9EAE6;
+            border-radius: 16px;
+            box-shadow: 0 8px 28px rgba(21,84,76,0.08);
             overflow: hidden;
           }
           .header {
-            background-color: #FFFFFF;
-            color: #0D1E1C;
-            padding: 14px 18px;
+            background-color: #0F766E;
+            color: #FFFFFF;
+            padding: 22px 24px 20px 24px;
             text-align: left;
-            border-bottom: 1px solid rgba(13,30,28,0.08);
+            border-bottom: 4px solid #F2B84B;
+          }
+          .eyebrow {
+            display: inline-block;
+            background-color: rgba(255,255,255,0.14);
+            border: 1px solid rgba(255,255,255,0.32);
+            border-radius: 999px;
+            color: #FFFFFF;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            padding: 5px 10px;
+            margin-bottom: 12px;
           }
           .header-table {
             width: 100%;
@@ -70,90 +86,80 @@ function buildEmailBody(sheet, rowIndex, rowData, headerMap) {
             padding: 0;
             vertical-align: middle;
           }
+          .header-main {
+            padding-right: 16px !important;
+          }
+          .header-status {
+            width: 118px;
+            text-align: right;
+          }
+          .job-number {
+            color: rgba(255,255,255,0.76);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            margin-bottom: 5px;
+          }
           .status-pill {
             display: inline-block;
-            min-width: 76px;
-            max-width: 112px;
-            color: #0D1E1C;
-            background-color: #F4FAFA;
-            border: 1px solid rgba(26,122,110,0.15);
-            border-radius: 100px;
-            padding: 6px 10px;
+            min-width: 74px;
+            max-width: 108px;
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 999px;
+            padding: 7px 11px;
             font-size: 12px;
             line-height: 1;
             font-weight: 800;
-            text-transform: none;
             text-align: center;
           }
           .header-subject {
             display: block;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            color: #0D1E1C;
-            font-size: 15px;
+            color: #FFFFFF !important;
+            font-size: 18px;
             font-weight: 800;
-            line-height: 1.25;
-            padding-left: 10px;
+            line-height: 1.35;
+            text-decoration: none;
+          }
+          a.header-subject,
+          a.header-subject:link,
+          a.header-subject:visited,
+          a.header-subject:hover,
+          a.header-subject:active {
+            color: #FFFFFF !important;
+            text-decoration: none !important;
           }
           .content {
-            padding: 18px;
+            padding: 22px 24px 24px 24px;
+          }
+          .action-row {
+            text-align: right;
+            margin: 0 0 14px 0;
+          }
+          .action-button {
+            display: inline-block;
+            background-color: #0F766E;
+            color: #FFFFFF !important;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: 800;
+            text-decoration: none;
           }
           .section {
-            margin-bottom: 16px;
+            margin-bottom: 18px;
+          }
+          .section-card {
+            background-color: #FFFFFF;
+            border: 1px solid #D9EAE6;
+            border-radius: 12px;
+            padding: 16px;
           }
           .section h2 {
-            font-size: 14px;
-            border-bottom: 1px solid rgba(26,122,110,0.15);
-            padding-bottom: 8px;
-            margin: 0 0 10px 0;
-            color: #1A7A6E;
-            letter-spacing: -0.01em;
-          }
-          .section h3 {
-            font-size: 14px;
-            margin: 12px 0 8px 0;
-            color: #0D1E1C;
-          }
-          .status-box {
-            background-color: #FFFFFF;
-            border-left: 4px solid #1A7A6E;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-          }
-          .status-box strong {
-            color: #1A7A6E;
-          }
-          .status-grid {
-            display: table;
-            width: 100%;
-            border-spacing: 6px 0;
-            margin-top: 8px;
-          }
-          .status-item {
-            display: table-cell;
-            width: 25%;
-            vertical-align: top;
-            padding: 10px 10px 9px 10px;
-            border-radius: 8px;
-            border: 1px solid rgba(13,30,28,0.08);
-            box-shadow: 0 2px 8px rgba(13,30,28,0.05);
-            text-align: center;
-          }
-          .status-item strong {
-            display: block;
-            font-size: 24px;
-            line-height: 1;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            margin-bottom: 5px;
-          }
-          .status-item span {
-            display: block;
-            font-size: 11px;
-            font-weight: 700;
-            line-height: 1.2;
+            font-size: 15px;
+            border-bottom: 1px solid #E1ECE9;
+            padding-bottom: 9px;
+            margin: 0 0 12px 0;
+            color: #0F766E;
           }
           table {
             width: 100%;
@@ -161,84 +167,148 @@ function buildEmailBody(sheet, rowIndex, rowData, headerMap) {
             border-spacing: 0;
             margin-top: 8px;
             background-color: #FFFFFF;
-            border: 1px solid rgba(13,30,28,0.08);
-            border-radius: 8px;
+            border: 1px solid #D9EAE6;
+            border-radius: 10px;
             overflow: hidden;
-            box-shadow: 0 1px 8px rgba(13,30,28,0.035);
           }
           table th {
-            background-color: #F4FAFA;
-            padding: 8px 10px;
+            background-color: #EFF7F5;
+            padding: 9px 10px;
             text-align: left;
-            font-weight: 700;
-            border-bottom: 1px solid rgba(13,30,28,0.08);
+            font-weight: 800;
+            color: #47716B;
+            border-bottom: 1px solid #D9EAE6;
             font-size: 11px;
           }
           table td {
-            padding: 8px 10px;
-            border-bottom: 1px solid rgba(13,30,28,0.08);
+            padding: 9px 10px;
+            border-bottom: 1px solid #E8F0EE;
             font-size: 12px;
-            color: #0D1E1C;
+            color: #16322F;
+            vertical-align: top;
           }
-          table tr:hover {
-            background-color: #F4FAFA;
+          .detail-table {
+            margin-top: 0;
+            table-layout: fixed;
           }
-          .label {
+          .detail-cell {
+            width: 50%;
+            padding: 11px 12px !important;
+          }
+          .detail-cell-left {
+            border-right: 1px solid #E8F0EE;
+          }
+          .detail-label {
+            display: block;
+            color: #6B8C88;
+            font-size: 10px;
             font-weight: 700;
-            color: #3A5C58;
-            width: 118px;
-            background-color: #F4FAFA;
+            margin-bottom: 3px;
+          }
+          .detail-value {
+            display: block;
+            color: #16322F;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.35;
+          }
+          .inline-status {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 4px 8px;
+            font-size: 10px;
+            font-weight: 800;
+          }
+          .flow-latest {
+            background-color: #EFF7F5;
+            border: 1px solid #CFE3DE;
+            border-left: 4px solid #0F766E;
+            border-radius: 10px;
+            padding: 12px 13px;
+            margin-bottom: 10px;
+          }
+          .flow-latest-label {
+            color: #6B8C88;
+            font-size: 10px;
+            font-weight: 800;
+            margin-bottom: 5px;
+          }
+          .flow-latest-status {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 800;
+            margin-bottom: 6px;
+          }
+          .flow-latest-people {
+            color: #27433F;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.45;
+          }
+          .flow-latest-time {
+            color: #6B8C88;
+            font-size: 10px;
+            margin-top: 4px;
+          }
+          .flow-table {
+            table-layout: fixed;
+          }
+          .flow-no {
+            width: 38px;
+            text-align: center;
+          }
+          .flow-time {
+            width: 130px;
+            white-space: nowrap;
+          }
+          .flow-status {
+            width: 72px;
           }
           .footer {
-            background-color: #DFF0EE;
-            padding: 10px 16px;
+            background-color: #E5F2EF;
+            padding: 12px 16px;
             font-size: 11px;
             color: #6B8C88;
             text-align: center;
-            border-top: 1px solid rgba(13,30,28,0.08);
+            border-top: 1px solid #D9EAE6;
           }
           .footer p {
             margin: 2px 0;
           }
           .updated-time {
-            color: #3A5C58;
-            margin-top: 2px;
+            color: #6B8C88;
+            margin-top: 4px;
             font-size: 11px;
-            background-color: rgba(26,122,110,0.08);
-            border: 1px solid rgba(26,122,110,0.15);
-            border-radius: 100px;
-            display: inline-block;
-            padding: 5px 11px;
+            text-align: right;
           }
           @media (max-width: 600px) {
             body {
-              padding: 10px;
+              padding: 10px 8px;
             }
             .container {
               border-radius: 12px;
             }
             .header {
-              padding: 12px;
+              padding: 18px 16px 16px 16px;
+            }
+            .header-main {
+              padding-right: 8px !important;
+            }
+            .header-status {
+              width: 92px;
             }
             .status-pill {
-              min-width: 64px;
+              min-width: 58px;
               font-size: 11px;
               padding: 6px 8px;
             }
             .header-subject {
-              font-size: 13px;
-              padding-left: 8px;
+              font-size: 16px;
             }
             .content {
-              padding: 12px;
-            }
-            .status-grid {
-              display: block;
-            }
-            .status-item {
-              display: block;
-              width: auto;
-              margin: 0 0 10px 0;
+              padding: 16px 14px 18px 14px;
             }
             table {
               font-size: 12px;
@@ -246,8 +316,22 @@ function buildEmailBody(sheet, rowIndex, rowData, headerMap) {
             table th, table td {
               padding: 7px;
             }
-            .label {
-              width: 104px;
+            .detail-table,
+            .detail-table tbody,
+            .detail-table tr,
+            .detail-table td {
+              display: block;
+              width: auto;
+            }
+            .detail-cell-left {
+              border-right: 0;
+            }
+            .flow-table .flow-no,
+            .flow-table .flow-time {
+              display: none;
+            }
+            .flow-table {
+              table-layout: auto;
             }
           }
         </style>
@@ -255,21 +339,24 @@ function buildEmailBody(sheet, rowIndex, rowData, headerMap) {
       <body>
         <div class="container">
           <div class="header">
+            <span class="eyebrow">CRM JOB UPDATE</span>
             <table class="header-table" role="presentation" cellpadding="0" cellspacing="0">
               <tr>
-                <td style="width:28%; text-align:left;">
-                  <span class="status-pill" style="background-color:${headerStatusColor}; color:${headerStatusTextColor};">${headerStatus}</span>
-                </td>
-                <td style="width:72%; text-align:left;">
+                <td class="header-main">
+                  <div class="job-number">JOB ${escapeHtml(rowData.jobNo || '-')}</div>
                   ${headerSubject}
+                </td>
+                <td class="header-status">
+                  <span class="status-pill" style="background-color:${headerStatusColor}; color:${headerStatusTextColor};">${headerStatus}</span>
                 </td>
               </tr>
             </table>
           </div>
           
           <div class="content">
+            ${jobAction ? '<div class="action-row">' + jobAction + '</div>' : ''}
             <!-- Job Details -->
-            <div class="section">
+            <div class="section section-card">
               <h2>รายละเอียดงาน</h2>
               ${detailsTable}
             </div>
@@ -325,8 +412,11 @@ function buildDailySummaryEmailBody(recipientId, relatedRows) {
   try {
     const statusSummary = buildSummaryCardsFromRows(relatedRows);
     const jobList = buildSummaryJobList(relatedRows, recipientId);
+    const trackedCount = relatedRows.filter((row) => normalizeSummaryStatus(row.status)).length;
+    const summaryMetrics = buildSummaryMetrics(relatedRows);
     const today = Utilities.formatDate(new Date(), EMAIL_TIMEZONE, 'dd/MM/yyyy');
     const contactMap = getEmailContactMap();
+    const prioritySummary = buildPrioritySummary(relatedRows);
     const recipientDisplayName = formatPersonWithName(recipientId, contactMap);
 
     const html = `
@@ -338,80 +428,182 @@ function buildDailySummaryEmailBody(recipientId, relatedRows) {
         <style>
           body {
             font-family: 'DM Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.45;
-            color: #0D1E1C;
-            background-color: #E8F4F2;
+            line-height: 1.5;
+            color: #16322F;
+            background-color: #EEF6F4;
             margin: 0;
-            padding: 12px;
+            padding: 20px 12px;
           }
           .container {
-            max-width: 820px;
+            max-width: 900px;
             margin: 0 auto;
-            background-color: #F4FAFA;
-            border: 1px solid rgba(26,122,110,0.15);
-            border-radius: 12px;
+            background-color: #F8FCFB;
+            border: 1px solid #D9EAE6;
+            border-radius: 16px;
             overflow: hidden;
+            box-shadow: 0 8px 28px rgba(21, 84, 76, 0.08);
           }
           .header {
-            background-color: #FFFFFF;
-            padding: 16px 18px;
-            border-bottom: 1px solid rgba(13,30,28,0.08);
+            background-color: #0F766E;
+            padding: 22px 24px 20px 24px;
+            border-bottom: 4px solid #F2B84B;
           }
           .eyebrow {
             display: inline-block;
-            background: rgba(26,122,110,0.08);
-            border: 1px solid rgba(26,122,110,0.15);
-            border-radius: 100px;
-            color: #1A7A6E;
+            background: rgba(255,255,255,0.14);
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 999px;
+            color: #FFFFFF;
             font-size: 11px;
             font-weight: 800;
-            padding: 5px 10px;
+            letter-spacing: 0.08em;
+            padding: 6px 11px;
           }
           .title {
-            margin: 10px 0 0 0;
-            font-size: 18px;
+            margin: 12px 0 0 0;
+            color: #FFFFFF;
+            font-size: 21px;
             line-height: 1.25;
             font-weight: 800;
           }
           .subtitle {
-            margin: 4px 0 0 0;
-            color: #3A5C58;
+            margin: 7px 0 0 0;
+            color: rgba(255,255,255,0.82);
             font-size: 12px;
           }
           .content {
-            padding: 18px;
+            padding: 22px 24px 24px 24px;
           }
           .section {
-            margin-bottom: 16px;
+            margin-bottom: 24px;
           }
           .section h2 {
-            font-size: 14px;
-            border-bottom: 1px solid rgba(26,122,110,0.15);
-            padding-bottom: 8px;
-            margin: 0 0 10px 0;
-            color: #1A7A6E;
+            font-size: 15px;
+            border-bottom: 1px solid #D9EAE6;
+            padding-bottom: 9px;
+            margin: 0 0 12px 0;
+            color: #0F766E;
+          }
+          .section-heading {
+            display: table;
+            width: 100%;
+          }
+          .section-heading h2,
+          .section-heading .section-total {
+            display: table-cell;
+            vertical-align: middle;
+          }
+          .section-heading h2 {
+            border-bottom: 0;
+            padding-bottom: 0;
+          }
+          .section-total {
+            text-align: right;
+            color: #0F766E;
+            font-size: 11px;
+            font-weight: 800;
+          }
+          .kpi-grid {
+            display: table;
+            width: 100%;
+            border-spacing: 8px 0;
+            margin: 0 -8px 20px -8px;
+            width: calc(100% + 16px);
+          }
+          .kpi-card {
+            display: table-cell;
+            width: 33.33%;
+            background: #FFFFFF;
+            border: 1px solid #D9EAE6;
+            border-radius: 10px;
+            padding: 11px 12px;
+            vertical-align: middle;
+          }
+          .kpi-label {
+            display: block;
+            color: #6B8C88;
+            font-size: 10px;
+            font-weight: 700;
+            margin-bottom: 4px;
+          }
+          .kpi-value {
+            display: block;
+            color: #0F766E;
+            font-size: 20px;
+            font-weight: 800;
+            line-height: 1;
+          }
+          .priority-panel {
+            background: #FFF9EC;
+            border: 1px solid #F2D28B;
+            border-left: 4px solid #F2B84B;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin: 0 0 22px 0;
+          }
+          .priority-title {
+            color: #8A5A00;
+            font-size: 13px;
+            font-weight: 800;
+            margin: 0 0 8px 0;
+          }
+          .priority-list {
+            margin: 0;
+            padding-left: 18px;
+          }
+          .priority-list li {
+            color: #5F4A1D;
+            font-size: 12px;
+            padding: 3px 0;
+          }
+          .priority-job {
+            font-weight: 800;
+          }
+          .priority-subject {
+            color: #6B5B38;
+          }
+          .age-badge {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 3px 7px;
+            font-size: 10px;
+            font-weight: 800;
+            white-space: nowrap;
+          }
+          .age-fresh {
+            background: #E7F6ED;
+            color: #1B7A45;
+          }
+          .age-warning {
+            background: #FFF3D6;
+            color: #8A5A00;
+          }
+          .age-critical {
+            background: #FDE3DE;
+            color: #AA2E21;
           }
           .status-grid {
             display: table;
             width: 100%;
-            border-spacing: 6px 0;
-            margin-top: 8px;
+            border-spacing: 8px 0;
+            margin: 0 -8px;
+            width: calc(100% + 16px);
           }
           .status-item {
             display: table-cell;
             width: 25%;
             vertical-align: top;
-            padding: 10px 10px 9px 10px;
-            border-radius: 8px;
-            border: 1px solid rgba(13,30,28,0.08);
+            padding: 14px 10px 12px 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(13,30,28,0.10);
             text-align: center;
           }
           .status-item strong {
             display: block;
-            font-size: 24px;
+            font-size: 27px;
             line-height: 1;
             font-weight: 800;
-            margin-bottom: 5px;
+            margin-bottom: 7px;
           }
           .status-item span {
             display: block;
@@ -422,23 +614,28 @@ function buildDailySummaryEmailBody(recipientId, relatedRows) {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            margin-top: 8px;
+            margin-top: 7px;
             background-color: #FFFFFF;
-            border: 1px solid rgba(13,30,28,0.08);
-            border-radius: 8px;
+            border: 1px solid #D9EAE6;
+            border-radius: 10px;
             overflow: hidden;
           }
           th {
-            background-color: #F4FAFA;
-            padding: 8px;
+            background-color: #EFF7F5;
+            padding: 9px 8px;
             text-align: left;
             font-size: 11px;
-            color: #3A5C58;
+            color: #47716B;
+            font-weight: 800;
           }
           td {
-            padding: 8px;
-            border-top: 1px solid rgba(13,30,28,0.08);
+            padding: 9px 8px;
+            border-top: 1px solid #E8F0EE;
             font-size: 12px;
+            vertical-align: top;
+          }
+          tr:nth-child(even) td {
+            background-color: #FBFDFC;
           }
           .summary-table {
             table-layout: fixed;
@@ -452,11 +649,11 @@ function buildDailySummaryEmailBody(recipientId, relatedRows) {
             white-space: nowrap;
           }
           .summary-assingto {
-            width: 120px;
+            width: 130px;
             white-space: nowrap;
           }
           .summary-date {
-            width: 140px;
+            width: 138px;
             white-space: nowrap;
           }
           .summary-age {
@@ -467,35 +664,61 @@ function buildDailySummaryEmailBody(recipientId, relatedRows) {
           .summary-subject {
             width: auto;
           }
-          .summary-card-list {
-            display: none;
+          a {
+            color: #0F766E;
+            text-decoration: none;
           }
-          .summary-card {
-            background-color: #FFFFFF;
-            border: 1px solid rgba(13,30,28,0.08);
-            border-radius: 8px;
-            margin: 8px 0;
-            padding: 10px;
+          .group-title {
+            display: table;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 11px 13px;
+            border-radius: 10px;
+            font-size: 14px;
+            line-height: 1.25;
+            margin: 20px 0 10px 0;
           }
-          .summary-card-top {
-            font-size: 11px;
-            color: #6B8C88;
-            margin-bottom: 4px;
+          .group-title-label,
+          .group-count {
+            display: table-cell;
+            vertical-align: middle;
           }
-          .summary-card-job {
-            font-size: 13px;
+          .group-title-label {
             font-weight: 800;
-            margin-bottom: 4px;
           }
-          .summary-card-subject {
-            font-size: 12px;
-            line-height: 1.35;
-            margin-bottom: 8px;
-          }
-          .summary-card-meta {
+          .group-count {
+            text-align: right;
             font-size: 11px;
-            color: #3A5C58;
-            line-height: 1.4;
+            font-weight: 800;
+            white-space: nowrap;
+          }
+          .group-title-primary {
+            background-color: #0F766E;
+            color: #FFFFFF;
+            border: 1px solid #0F766E;
+          }
+          .group-title-primary .group-count {
+            color: #FFFFFF;
+            background-color: rgba(255,255,255,0.16);
+            border-radius: 999px;
+            padding: 4px 8px;
+          }
+          .group-title-secondary {
+            background-color: #EFF7F5;
+            color: #35665F;
+            border: 1px solid #CFE3DE;
+          }
+          .group-title-secondary .group-count {
+            color: #0F766E;
+            background-color: #FFFFFF;
+            border: 1px solid #CFE3DE;
+            border-radius: 999px;
+            padding: 4px 8px;
+          }
+          .status-title {
+            font-size: 12px;
+            color: #16322F;
+            margin: 14px 0 6px 0;
           }
           .status-text {
             font-weight: 800;
@@ -505,21 +728,39 @@ function buildDailySummaryEmailBody(recipientId, relatedRows) {
             font-size: 11px;
           }
           .footer {
-            background-color: #DFF0EE;
-            padding: 10px 16px;
+            background-color: #E5F2EF;
+            padding: 12px 16px;
             font-size: 11px;
             color: #6B8C88;
             text-align: center;
           }
           @media (max-width: 600px) {
             body {
-              padding: 10px;
+              padding: 10px 8px;
             }
             .content {
-              padding: 12px;
+              padding: 16px 14px 18px 14px;
+            }
+            .kpi-grid {
+              display: block;
+              width: 100%;
+              margin: 0 0 18px 0;
+            }
+            .kpi-card {
+              display: block;
+              width: auto;
+              margin: 0 0 8px 0;
+            }
+            .header {
+              padding: 18px 16px 16px 16px;
+            }
+            .title {
+              font-size: 18px;
             }
             .status-grid {
               display: block;
+              width: 100%;
+              margin: 0;
             }
             .status-item {
               display: block;
@@ -531,10 +772,27 @@ function buildDailySummaryEmailBody(recipientId, relatedRows) {
               font-size: 11px;
             }
             .summary-table {
+              display: table;
+              table-layout: auto;
+            }
+            .summary-table .summary-assingto,
+            .summary-table .summary-date {
               display: none;
             }
-            .summary-card-list {
-              display: block;
+            .summary-table .summary-no {
+              width: 32px;
+            }
+            .summary-table .summary-job {
+              width: 108px;
+              white-space: normal;
+              word-break: break-word;
+            }
+            .summary-table .summary-subject {
+              width: auto;
+              word-break: break-word;
+            }
+            .summary-table .summary-age {
+              width: 62px;
             }
           }
         </style>
@@ -547,8 +805,13 @@ function buildDailySummaryEmailBody(recipientId, relatedRows) {
             <div class="subtitle">ผู้รับ: ${escapeHtml(recipientDisplayName)} | วันที่รายงาน: ${escapeHtml(today)}</div>
           </div>
           <div class="content">
+            ${buildSummaryKpiCards(summaryMetrics)}
+            ${prioritySummary}
             <div class="section">
-              <h2>สรุปจำนวนเคสตามสถานะ</h2>
+              <div class="section-heading">
+                <h2>สรุปจำนวนเคสตามสถานะ</h2>
+                <span class="section-total">รวม ${escapeHtml(String(trackedCount))} รายการ</span>
+              </div>
               ${statusSummary}
             </div>
             <div class="section">
@@ -673,6 +936,97 @@ function getEmployeeDepartment(assigntoId) {
 }
 
 /**
+ * สร้างตัวเลข KPI สำหรับส่วนบนของ Report Summary
+ * @param {Array<Object>} rows - รายการงานที่เกี่ยวข้อง
+ * @return {Object} ค่า KPI ที่จัดรูปแบบแล้ว
+ */
+function buildSummaryMetrics(rows) {
+  const trackedRows = rows.filter((row) => normalizeSummaryStatus(row.status));
+  const ages = trackedRows
+    .map((row) => getCaseAgeDays(row.contactDate))
+    .filter((age) => age !== '' && !isNaN(Number(age)))
+    .map((age) => Number(age));
+  const todayKey = Utilities.formatDate(new Date(), EMAIL_TIMEZONE, 'dd/MM/yyyy');
+  const newToday = trackedRows.filter((row) => {
+    const date = parseContactDateValue(row.contactDate);
+    return date && Utilities.formatDate(date, EMAIL_TIMEZONE, 'dd/MM/yyyy') === todayKey;
+  }).length;
+
+  return {
+    total: trackedRows.length,
+    oldest: ages.length > 0 ? Math.max.apply(null, ages) : '-',
+    newToday: newToday
+  };
+}
+
+/**
+ * สร้าง KPI cards สำหรับอีเมล Report Summary
+ * @param {Object} metrics - ค่า KPI
+ * @return {string} HTML KPI cards
+ */
+function buildSummaryKpiCards(metrics) {
+  return `
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-label">เคสที่ต้องติดตาม</span>
+        <span class="kpi-value">${escapeHtml(String(metrics.total))}</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">เคสเก่าสุด (วัน)</span>
+        <span class="kpi-value">${escapeHtml(String(metrics.oldest))}</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">เคสที่แจ้งวันนี้</span>
+        <span class="kpi-value">${escapeHtml(String(metrics.newToday))}</span>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * สร้างกลุ่มเคสที่ควรติดตามก่อน โดยเลือกจากอายุเคสมากที่สุด
+ * @param {Array<Object>} rows - รายการงานที่เกี่ยวข้อง
+ * @param {Object} contactMap - map รายชื่อผู้ติดต่อ
+ * @return {string} HTML priority panel
+ */
+function buildPrioritySummary(rows) {
+  const priorityRows = rows
+    .filter((row) => normalizeSummaryStatus(row.status))
+    .sort(compareRowsByCaseAgeDaysDesc)
+    .slice(0, 3);
+
+  if (priorityRows.length === 0) {
+    return '';
+  }
+
+  let html = `
+    <div class="priority-panel">
+      <div class="priority-title">เคสที่ควรติดตามก่อน</div>
+      <ol class="priority-list">
+  `;
+
+  priorityRows.forEach((row) => {
+    const age = getCaseAgeDays(row.contactDate);
+    html += `
+      <li>
+        <div class="priority-job">
+          ${buildJobLinkHtml(row.jobNo, row.jobNo, '')}
+          <span class="age-badge ${getCaseAgeClass(row.contactDate)}">${escapeHtml(age || '-')} วัน</span>
+        </div>
+        <div class="priority-subject">${escapeHtml(truncateText(row.subject, 110))} · ${escapeHtml(normalizeSummaryStatus(row.status))}</div>
+      </li>
+    `;
+  });
+
+  html += `
+      </ol>
+    </div>
+  `;
+
+  return html;
+}
+
+/**
  * สร้าง card สรุปสถานะ 4 สถานะหลักจากรายการงาน
  * @param {Array<Object>} rows - รายการงาน
  * @return {string} HTML card summary
@@ -725,7 +1079,7 @@ function buildSummaryJobList(rows, recipientId) {
     return '<p class="muted">ไม่มีรายการในสถานะ Open, Continue, EditErr หรือ Test</p>';
   }
 
-  let html = '<p class="muted">รวมทั้งหมด ' + trackedRows.length + ' รายการ</p>';
+  let html = '<p class="muted">เรียงจากเคสที่มีอายุสูงสุด เพื่อช่วยจัดลำดับการติดตาม</p>';
   const assingtoMatchedRows = normalizedRecipientId
     ? trackedRows.filter((row) => normalizeId(row.assignto) === normalizedRecipientId)
     : [];
@@ -734,12 +1088,12 @@ function buildSummaryJobList(rows, recipientId) {
     : trackedRows;
 
   if (assingtoMatchedRows.length > 0) {
-    html += buildSummaryJobGroup('Assingto ตรงกับผู้รับอีเมล', assingtoMatchedRows, statuses, contactMap);
+    html += buildSummaryJobGroup('ผู้รับผิดชอบตรงกับผู้รับอีเมล', assingtoMatchedRows, statuses, contactMap, 'primary');
   }
 
   if (otherRelatedRows.length > 0) {
     const title = assingtoMatchedRows.length > 0 ? 'งานเกี่ยวข้องอื่น' : 'รายการงาน';
-    html += buildSummaryJobGroup(title, otherRelatedRows, statuses, contactMap);
+    html += buildSummaryJobGroup(title, otherRelatedRows, statuses, contactMap, 'secondary');
   }
 
   return html;
@@ -751,10 +1105,17 @@ function buildSummaryJobList(rows, recipientId) {
  * @param {Array<Object>} rows - รายการงาน
  * @param {Array<string>} statuses - สถานะที่ต้องแสดง
  * @param {Object} contactMap - map จาก getEmailContactMap
+ * @param {string} groupVariant - รูปแบบหัวกลุ่ม primary หรือ secondary
  * @return {string} HTML table/card group
  */
-function buildSummaryJobGroup(title, rows, statuses, contactMap) {
-  let html = '<h3 style="font-size:13px; color:#1A7A6E; margin:16px 0 8px 0;">' + escapeHtml(title) + ' (' + rows.length + ')</h3>';
+function buildSummaryJobGroup(title, rows, statuses, contactMap, groupVariant) {
+  const safeVariant = groupVariant === 'primary' ? 'primary' : 'secondary';
+  let html = `
+    <h3 class="group-title group-title-${safeVariant}">
+      <span class="group-title-label">${escapeHtml(title)}</span>
+      <span class="group-count">${rows.length} เคส</span>
+    </h3>
+  `;
 
   statuses.forEach((status) => {
     const statusRows = rows.filter((row) => normalizeSummaryStatus(row.status) === status);
@@ -763,13 +1124,13 @@ function buildSummaryJobGroup(title, rows, statuses, contactMap) {
     }
 
     html += `
-      <h3 style="font-size:13px; color:#0D1E1C; margin:14px 0 6px 0;">${escapeHtml(status)} (${statusRows.length})</h3>
+      <h3 class="status-title">${escapeHtml(status)} (${statusRows.length})</h3>
       <table class="summary-table">
         <tr>
           <th class="summary-no">ลำดับ</th>
           <th class="summary-job">Job No</th>
           <th class="summary-subject">เรื่องที่แจ้ง</th>
-          <th class="summary-assingto">Assingto</th>
+          <th class="summary-assingto">ผู้รับผิดชอบ</th>
           <th class="summary-date">วันที่แจ้ง</th>
           <th class="summary-age">จำนวนวัน</th>
         </tr>
@@ -783,30 +1144,12 @@ function buildSummaryJobGroup(title, rows, statuses, contactMap) {
           <td class="summary-subject">${buildJobLinkHtml(row.jobNo, truncateText(row.subject, 90), '')}</td>
           <td class="summary-assingto">${escapeHtml(formatPersonWithName(row.assignto, contactMap) || '-')}</td>
           <td class="summary-date">${escapeHtml(formatSummaryContactDate(row.contactDate))}</td>
-          <td class="summary-age">${escapeHtml(getCaseAgeDays(row.contactDate))}</td>
+          <td class="summary-age"><span class="age-badge ${getCaseAgeClass(row.contactDate)}">${escapeHtml(getCaseAgeDays(row.contactDate) || '-')} วัน</span></td>
         </tr>
       `;
     });
 
     html += '</table>';
-    html += '<div class="summary-card-list">';
-
-    statusRows.forEach((row, index) => {
-      html += `
-        <div class="summary-card">
-          <div class="summary-card-top">#${index + 1} | ${escapeHtml(status)}</div>
-          <div class="summary-card-job">${buildJobLinkHtml(row.jobNo, row.jobNo, '')}</div>
-          <div class="summary-card-subject">${buildJobLinkHtml(row.jobNo, truncateText(row.subject, 120), '')}</div>
-          <div class="summary-card-meta">
-            Assingto: ${escapeHtml(formatPersonWithName(row.assignto, contactMap) || '-')}<br>
-            วันที่แจ้ง: ${escapeHtml(formatSummaryContactDate(row.contactDate))}<br>
-            จำนวนวัน: ${escapeHtml(getCaseAgeDays(row.contactDate))}
-          </div>
-        </div>
-      `;
-    });
-
-    html += '</div>';
   });
 
   return html;
@@ -820,43 +1163,49 @@ function buildSummaryJobGroup(title, rows, statuses, contactMap) {
 function buildDetailsTable(rowData) {
   try {
     const contactMap = getEmailContactMap();
+    const statusColor = getStatusColor(rowData.status);
+    const statusTextColor = getStatusTextColor(rowData.status);
     const html = `
-      <table>
+      <table class="detail-table" role="presentation" cellpadding="0" cellspacing="0">
         <tr>
-          <th class="label">Job No</th>
-          <td>${buildJobLinkHtml(rowData.jobNo, rowData.jobNo, '')}</td>
+          <td class="detail-cell detail-cell-left">
+            <span class="detail-label">JOB NO</span>
+            <span class="detail-value">${buildJobLinkHtml(rowData.jobNo, rowData.jobNo, '')}</span>
+          </td>
+          <td class="detail-cell">
+            <span class="detail-label">สถานะปัจจุบัน</span>
+            <span class="detail-value"><span class="inline-status" style="background-color:${statusColor}; color:${statusTextColor};">${escapeHtml(rowData.status || '-')}</span></span>
+          </td>
         </tr>
         <tr>
-          <th class="label">เรื่องที่แจ้ง</th>
-          <td>${buildJobLinkHtml(rowData.jobNo, rowData.subject, '')}</td>
+          <td class="detail-cell detail-cell-left">
+            <span class="detail-label">ผู้แจ้ง</span>
+            <span class="detail-value">${escapeHtml(formatPersonWithName(rowData.ownerSubjectId, contactMap) || '-')}</span>
+          </td>
+          <td class="detail-cell">
+            <span class="detail-label">วันที่แจ้ง</span>
+            <span class="detail-value">${escapeHtml(formatSummaryContactDate(rowData.contactDate) || '-')}</span>
+          </td>
         </tr>
         <tr>
-          <th class="label">ผู้แจ้ง</th>
-          <td>${escapeHtml(formatPersonWithName(rowData.ownerSubjectId, contactMap))}</td>
+          <td class="detail-cell detail-cell-left">
+            <span class="detail-label">ผู้รับผิดชอบ</span>
+            <span class="detail-value">${escapeHtml(formatPersonWithName(rowData.assignto, contactMap) || '-')}</span>
+          </td>
+          <td class="detail-cell">
+            <span class="detail-label">DEV</span>
+            <span class="detail-value">${escapeHtml(formatPersonWithName(rowData.sysDevelop, contactMap) || '-')}</span>
+          </td>
         </tr>
         <tr>
-          <th class="label">วันที่แจ้ง</th>
-          <td>${escapeHtml(rowData.contactDate)}</td>
-        </tr>
-        <tr>
-          <th class="label">ผู้รับแจ้ง</th>
-          <td>${escapeHtml(formatPersonWithName(rowData.assignto, contactMap))}</td>
-        </tr>
-        <tr>
-          <th class="label">ประเภทบริการ</th>
-          <td>${escapeHtml(rowData.sysserViceTypeName)}</td>
-        </tr>
-        <tr>
-          <th class="label">สถานะ</th>
-          <td><strong>${escapeHtml(rowData.status)}</strong></td>
-        </tr>
-        <tr>
-          <th class="label">โปรแกรม</th>
-          <td>${escapeHtml(rowData.productName)}</td>
-        </tr>
-        <tr>
-          <th class="label">DEV</th>
-          <td>${escapeHtml(formatPersonWithName(rowData.sysDevelop, contactMap))}</td>
+          <td class="detail-cell detail-cell-left">
+            <span class="detail-label">ประเภทบริการ</span>
+            <span class="detail-value">${escapeHtml(rowData.sysserViceTypeName || '-')}</span>
+          </td>
+          <td class="detail-cell">
+            <span class="detail-label">โปรแกรม</span>
+            <span class="detail-value">${escapeHtml(rowData.productName || '-')}</span>
+          </td>
         </tr>
       </table>
     `;
@@ -891,21 +1240,25 @@ function buildFlowTrackingSection(sheet, rowIndex, rowData, headerMap) {
 
     const contactMap = getEmailContactMap();
     const latest = events[events.length - 1];
+    const latestStatusColor = getStatusColor(latest.status);
+    const latestStatusTextColor = getStatusTextColor(latest.status);
     let html = `
-      <div class="section">
-        <h2>ติดตาม Flow งาน</h2>
-        <div style="background:#FFFFFF; border:1px solid rgba(13,30,28,0.08); border-radius:8px; padding:10px; margin-bottom:8px;">
-          <div style="font-size:11px; color:#6B8C88; font-weight:700;">ล่าสุด</div>
-          <div style="font-size:13px; font-weight:800; color:#0D1E1C; margin-top:2px;">
-            ${escapeHtml(latest.status || '-')} | ผู้รับแจ้ง: ${escapeHtml(formatPersonWithName(latest.assignto, contactMap) || '-')} | DEV: ${escapeHtml(formatPersonWithName(latest.sysDevelop, contactMap) || '-')}
+      <div class="section section-card">
+        <h2>การติดตาม Flow งาน</h2>
+        <div class="flow-latest">
+          <div class="flow-latest-label">สถานะล่าสุด</div>
+          <div><span class="flow-latest-status" style="background-color:${latestStatusColor}; color:${latestStatusTextColor};">${escapeHtml(latest.status || '-')}</span></div>
+          <div class="flow-latest-people">
+            ผู้รับผิดชอบ: ${escapeHtml(formatPersonWithName(latest.assignto, contactMap) || '-')}<br>
+            DEV: ${escapeHtml(formatPersonWithName(latest.sysDevelop, contactMap) || '-')}
           </div>
-          <div style="font-size:11px; color:#6B8C88; margin-top:2px;">${escapeHtml(formatFlowTrackingTimestamp(latest.timestamp))}</div>
+          <div class="flow-latest-time">อัปเดตเมื่อ ${escapeHtml(formatFlowTrackingTimestamp(latest.timestamp))}</div>
         </div>
-        <table>
+        <table class="flow-table">
           <tr>
-            <th>ลำดับ</th>
-            <th>เวลา</th>
-            <th>สถานะ</th>
+            <th class="flow-no">#</th>
+            <th class="flow-time">วันและเวลา</th>
+            <th class="flow-status">สถานะ</th>
             <th>ผู้รับแจ้ง</th>
             <th>DEV</th>
           </tr>
@@ -914,11 +1267,11 @@ function buildFlowTrackingSection(sheet, rowIndex, rowData, headerMap) {
     events.forEach((event, index) => {
       html += `
         <tr>
-          <td>${index + 1}</td>
-          <td>${escapeHtml(formatFlowTrackingTimestamp(event.timestamp))}</td>
-          <td><strong>${escapeHtml(event.status)}</strong></td>
-          <td>${escapeHtml(formatPersonWithName(event.assignto, contactMap))}</td>
-          <td>${escapeHtml(formatPersonWithName(event.sysDevelop, contactMap))}</td>
+          <td class="flow-no">${index + 1}</td>
+          <td class="flow-time">${escapeHtml(formatFlowTrackingTimestamp(event.timestamp))}</td>
+          <td class="flow-status"><strong>${escapeHtml(event.status || '-')}</strong></td>
+          <td>${escapeHtml(formatPersonWithName(event.assignto, contactMap) || '-')}</td>
+          <td>${escapeHtml(formatPersonWithName(event.sysDevelop, contactMap) || '-')}</td>
         </tr>
       `;
     });
@@ -1188,10 +1541,12 @@ function buildJobLinkHtml(jobNo, text, className) {
   const safeText = escapeHtml(text);
   const safeClassName = String(className || '').trim();
   const classAttribute = safeClassName ? ' class="' + escapeHtml(safeClassName) + '"' : '';
-  const inlineStyle = safeClassName ? '' : ' style="color:#0F766E; font-weight:700; text-decoration:none;"';
+  const inlineStyle = safeClassName === 'header-subject'
+    ? ' style="display:block; color:#FFFFFF !important; font-weight:800; line-height:1.35; text-decoration:none !important;"'
+    : (safeClassName ? '' : ' style="color:#0F766E; font-weight:700; text-decoration:none;"');
 
   if (!url) {
-    return safeClassName ? '<span' + classAttribute + '>' + safeText + '</span>' : safeText;
+    return safeClassName ? '<span' + classAttribute + inlineStyle + '>' + safeText + '</span>' : safeText;
   }
 
   return '<a href="' + escapeHtml(url) + '"' + classAttribute + inlineStyle + ' target="_blank" rel="noopener noreferrer">' + safeText + '</a>';
@@ -1206,10 +1561,10 @@ function getStatusColor(status) {
   const statusLower = String(status || '').trim().toLowerCase();
   
   const colorMap = {
-    'open': '#DCDCDC',
-    'continue': '#FFA500',
-    'editerr': '#FF4500',
-    'test': '#4169E1'
+    'open': '#E9EEF0',
+    'continue': '#FFF3D6',
+    'editerr': '#FDE3DE',
+    'test': '#E5ECFF'
   };
   
   return colorMap[statusLower] || '#FFFFFF';
@@ -1287,6 +1642,35 @@ function getCaseAgeDays(value) {
 }
 
 /**
+ * คืน class สีตามอายุเคสสำหรับใช้เป็น badge ใน Report Summary
+ * @param {*} value - วันที่แจ้ง
+ * @return {string} CSS class
+ */
+function getCaseAgeClass(value) {
+  const ageText = getCaseAgeDays(value);
+
+  if (ageText === '') {
+    return 'age-warning';
+  }
+
+  const age = Number(ageText);
+
+  if (isNaN(age)) {
+    return 'age-warning';
+  }
+
+  if (age >= 30) {
+    return 'age-critical';
+  }
+
+  if (age >= 8) {
+    return 'age-warning';
+  }
+
+  return 'age-fresh';
+}
+
+/**
  * เรียงรายการ Report Summary ตามจำนวนวันจากมากไปน้อย
  * @param {Object} a - row แรก
  * @param {Object} b - row ที่สอง
@@ -1345,9 +1729,12 @@ function normalizeId(value) {
 function getStatusTextColor(status) {
   const statusLower = String(status || '').trim().toLowerCase();
 
-  if (statusLower === 'continue' || statusLower === 'editerr' || statusLower === 'test') {
-    return '#FFFFFF';
-  }
+  const textColorMap = {
+    'open': '#27433F',
+    'continue': '#8A5A00',
+    'editerr': '#AA2E21',
+    'test': '#2A55B8'
+  };
 
-  return '#0D1E1C';
+  return textColorMap[statusLower] || '#16322F';
 }
